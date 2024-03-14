@@ -11,11 +11,11 @@
 # the variable names.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Feb-18 [Martinski W.]
+# Last Modified: 2024-Mar-13 [Martinski W.]
 ####################################################################
 set -u
 
-TEST_VERSION="0.5.8"
+TEST_VERSION="0.5.9"
 
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
@@ -168,5 +168,7 @@ fi
 } > "$tmpEMailBodyFile"
 
 _SendEMailNotification_ "EmailTEST" "$emailSubject" "$tmpEMailBodyFile" "$emailBodyTitle"
+
+[ -f "$tmpEMailBodyFile" ] && rm -f "$tmpEMailBodyFile"
 
 #EOF#
