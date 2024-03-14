@@ -3,11 +3,11 @@
 # FILENAME: CustomEMailFunctions.lib.sh
 # TAG: _LIB_CustomEMailFunctions_SHELL_
 #
-# Custom miscellaneous definitions & functions to send
-# email notifications using AMTM optional email config.
+# Custom miscellaneous definitions and functions to send
+# email notifications using AMTM email configuration file.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Mar-09 [Martinski W.]
+# Last Modified: 2024-Mar-13 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -15,7 +15,7 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="0.9.16"
+CEM_LIB_VERSION="0.9.17"
 CEM_TXT_VERFILE="cemVersion.txt"
 
 CEM_LIB_SCRIPT_TAG="master"
@@ -35,9 +35,6 @@ then cemDoSystemLogFile=true ; fi
 
 if [ -z "${cemDeleteMailContentFile:+xSETx}" ]
 then cemDeleteMailContentFile=true ; fi
-
-if [ -z "${cemSendEMailNotificationsFlag:+xSETx}" ]
-then cemSendEMailNotificationsFlag=true ; fi
 
 cemScriptDirPath="$(/usr/bin/dirname "$0")"
 cemScriptFileName="${0##*/}"
@@ -74,18 +71,12 @@ PASSWORD=""  emailPwEnc=""
 # Custom Additions ##
 CC_NAME=""  CC_ADDRESS=""
 
-if [ -f "$amtmEMailConfFile" ]
-then
-    . "$amtmEMailConfFile"
-else
-    cemSendEMailNotificationsFlag=false
-fi
+[ -f "$amtmEMailConfFile" ] && . "$amtmEMailConfFile"
 
 #-------------------------------------------------------#
 _DoReInit_CEM_()
 {
    unset amtmIsEMailConfigFileEnabled \
-         cemSendEMailNotificationsFlag \
          _LIB_CustomEMailFunctions_SHELL_
 }
 
@@ -144,7 +135,7 @@ _CheckLibraryUpdates_CEM_()
    then
        retCode=1
        "$cemIsInteractive" && "$cemIsVerboseMode" && "$showMsg" && \
-       printf "\nDone.\n"
+       printf "Done.\n"
    else
        _DoReInit_CEM_
        retCode=0
@@ -172,28 +163,37 @@ _GetRouterModelID_CEM_()
 #-------------------------------------------------------#
 CheckEMailConfigFileFromAMTM_CEM_()
 {
-   local logMsg
    amtmIsEMailConfigFileEnabled=false
 
-   if [ ! -f "$amtmEMailConfFile" ] || [ ! -f "$amtmEMailPswdFile" ]
+   if [ ! -f "$amtmEMailConfFile" ]
    then
        if "$cemIsInteractive"
        then
            printf "\n**ERROR**: Unable to send email notifications."
-           printf "\nEmail configuration file is not yet set up or password has not been defined.\n"
+           printf "\nAMTM email configuration file is not yet set up.\n"
+       fi
+       return 1
+   fi
+
+   if [ ! -s "$amtmEMailPswdFile" ] || [ -z "$emailPwEnc" ] || \
+      [ "$PASSWORD" = "PUT YOUR PASSWORD HERE" ]
+   then
+       if "$cemIsInteractive"
+       then
+           printf "\n**ERROR**: Unable to send email notifications."
+           printf "\nThe AMTM email password has not been set up.\n"
        fi
        return 1
    fi
 
    if [ -z "$TO_NAME" ] || [ -z "$USERNAME" ] || \
       [ -z "$FROM_ADDRESS" ] || [ -z "$TO_ADDRESS" ] || \
-      [ -z "$SMTP" ] || [ -z "$PORT" ] || [ -z "$PROTOCOL" ] || \
-      [ -z "$emailPwEnc" ] || [ "$PASSWORD" = "PUT YOUR PASSWORD HERE" ]
+      [ -z "$SMTP" ] || [ -z "$PORT" ] || [ -z "$PROTOCOL" ]
    then
        if "$cemIsInteractive"
        then
            printf "\n**ERROR**: Unable to send email notifications."
-           printf "\nSome email configuration variables are not yet set up.\n"
+           printf "\nSome AMTM email configuration variables are not yet set up.\n"
        fi
        return 1
    fi
@@ -235,7 +235,7 @@ _CreateEMailContent_CEM_()
         fi
     else
         emailBodyMsge="$(echo "$emailBodyMsge" | sed 's/[<]b[>]//g ; s/[<]\/b[>]//g')"
-        emailBodyTitle="$(echo "$emailBodyMsge" | sed 's/[<]h[1-5][>]//g ; s/[<]\/h[1-5][>]//g')"
+        emailBodyTitle="$(echo "$emailBodyTitle" | sed 's/[<]h[1-5][>]//g ; s/[<]\/h[1-5][>]//g')"
     fi
 
     if [ -n "$CC_NAME" ] && [ -n "$CC_ADDRESS" ]
@@ -317,7 +317,6 @@ EOF
 _SendEMailNotification_CEM_()
 {
    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] || \
-      ! "$cemSendEMailNotificationsFlag" || \
       ! CheckEMailConfigFileFromAMTM_CEM_
    then return 1 ; fi
 
