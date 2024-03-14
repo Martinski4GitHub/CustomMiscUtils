@@ -163,23 +163,32 @@ _GetRouterModelID_CEM_()
 #-------------------------------------------------------#
 CheckEMailConfigFileFromAMTM_CEM_()
 {
-   local logMsg
    amtmIsEMailConfigFileEnabled=false
 
-   if [ ! -f "$amtmEMailConfFile" ] || [ ! -f "$amtmEMailPswdFile" ]
+   if [ ! -f "$amtmEMailConfFile" ]
    then
        if "$cemIsInteractive"
        then
            printf "\n**ERROR**: Unable to send email notifications."
-           printf "\nAMTM email configuration file is not yet set up or password has not been defined.\n"
+           printf "\nAMTM email configuration file is not yet set up.\n"
+       fi
+       return 1
+   fi
+
+   if [ ! -s "$amtmEMailPswdFile" ] || [ -z "$emailPwEnc" ] || \
+      [ "$PASSWORD" = "PUT YOUR PASSWORD HERE" ]
+   then
+       if "$cemIsInteractive"
+       then
+           printf "\n**ERROR**: Unable to send email notifications."
+           printf "\nThe AMTM email password has not been set up.\n"
        fi
        return 1
    fi
 
    if [ -z "$TO_NAME" ] || [ -z "$USERNAME" ] || \
       [ -z "$FROM_ADDRESS" ] || [ -z "$TO_ADDRESS" ] || \
-      [ -z "$SMTP" ] || [ -z "$PORT" ] || [ -z "$PROTOCOL" ] || \
-      [ -z "$emailPwEnc" ] || [ "$PASSWORD" = "PUT YOUR PASSWORD HERE" ]
+      [ -z "$SMTP" ] || [ -z "$PORT" ] || [ -z "$PROTOCOL" ]
    then
        if "$cemIsInteractive"
        then
@@ -226,7 +235,7 @@ _CreateEMailContent_CEM_()
         fi
     else
         emailBodyMsge="$(echo "$emailBodyMsge" | sed 's/[<]b[>]//g ; s/[<]\/b[>]//g')"
-        emailBodyTitle="$(echo "$emailBodyMsge" | sed 's/[<]h[1-5][>]//g ; s/[<]\/h[1-5][>]//g')"
+        emailBodyTitle="$(echo "$emailBodyTitle" | sed 's/[<]h[1-5][>]//g ; s/[<]\/h[1-5][>]//g')"
     fi
 
     if [ -n "$CC_NAME" ] && [ -n "$CC_ADDRESS" ]
