@@ -21,7 +21,7 @@
 #    nvramSaveSnapshot.sh  AFTER_CustomSetup
 #--------------------------------------------------------------------
 # Creation Date: 2021-Jan-24 [Martinski W.]
-# Last Modified: 2021-Aug-19 [Martinski W.]
+# Last Modified: 2024-Mar-19 [Martinski W.]
 #####################################################################
 set -u
 
@@ -43,7 +43,7 @@ fi
 fileDateTime="%Y-%m-%d_%H-%M-%S"
 savefileName="${fileNamePrefix}_$(date +"$fileDateTime").txt"
 saveFilePath="${saveDirPath}/$savefileName"
-filterStr="([0-1]:.*|ASUS_EULA_time=|TM_EULA_time=|sys_uptime_now=|asdfile_ip_chksum=|asdfile_dns_chksum=|buildinfo=|nc_setting_conf=|rc_support=)"
+filterStr="([0-3]:.*|ASUS_EULA_time=|TM_EULA_time=|sys_uptime_now=|asdfile_ip_chksum=|asdfile_dns_chksum=|buildinfo=|nc_setting_conf=|rc_support=)"
 
 nvram show 2>/dev/null | grep -vE "^$filterStr" | sort -d -t '=' -k 1 > "$saveFilePath"
 
