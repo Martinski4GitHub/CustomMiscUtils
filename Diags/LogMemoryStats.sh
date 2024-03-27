@@ -34,11 +34,11 @@
 # cru a LogMemStats "*/30 * * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Mar-23 [Martinski W.]
+# Last Modified: 2024-Mar-26 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.6.0"
+readonly LMS_VERSION="0.6.1"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -768,12 +768,11 @@ _SendEMailNotification_()
 _ProcMemInfo_()
 {
    printf "/proc/meminfo\n-------------\n"
-   grep -E '^Mem[TFA].*:[[:blank:]]+ .* kB$' /proc/meminfo
-   grep -E '^Buffers:[[:blank:]]+ .* kB$' /proc/meminfo
-   grep -E '^Cached:[[:blank:]]+ .* kB$' /proc/meminfo
-   grep -E '^Swap[TFC].*:[[:blank:]]+ .* kB$' /proc/meminfo
-   grep -E '^Active(\([af].*\))?:[[:blank:]]+ .* kB$' /proc/meminfo
-   grep -E '^Inactive(\([af].*\))?:[[:blank:]]+ .* kB$' /proc/meminfo
+   grep -E '^Mem[TFA].*:[[:blank:]]+.*' /proc/meminfo
+   grep -E '^(Buffers|Cached):[[:blank:]]+.*' /proc/meminfo
+   grep -E '^Swap[TFC].*:[[:blank:]]+.*' /proc/meminfo
+   grep -E '^(Active|Inactive)(\([af].*\))?:[[:blank:]]+.*' /proc/meminfo
+   grep -E '^(Dirty|Writeback|AnonPages|Unevictable):[[:blank:]]+.*' /proc/meminfo
 }
 
 duMinKB="$duFilterSizeKB"
