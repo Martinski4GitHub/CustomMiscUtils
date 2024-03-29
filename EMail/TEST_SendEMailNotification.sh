@@ -11,11 +11,11 @@
 # the variable names.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Mar-13 [Martinski W.]
+# Last Modified: 2024-Mar-28 [Martinski W.]
 ####################################################################
 set -u
 
-TEST_VERSION="0.5.9"
+TEST_VERSION="0.5.10"
 
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
@@ -43,7 +43,7 @@ _DownloadCEMLibraryFile_()
    "${CEM_LIB_URL}/$CUSTOM_EMAIL_LIBName" -o "$CUSTOM_EMAIL_LIBFile"
    curlCode="$?"
 
-   if [ "$curlCode" -eq 0 ] && [ -f "$CUSTOM_EMAIL_LIBFile" ]
+   if [ "$curlCode" -eq 0 ] && [ -s "$CUSTOM_EMAIL_LIBFile" ]
    then
        retCode=0
        chmod 755 "$CUSTOM_EMAIL_LIBFile"
