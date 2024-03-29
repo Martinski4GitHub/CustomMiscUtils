@@ -34,11 +34,11 @@
 # cru a LogMemStats "*/30 * * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Mar-26 [Martinski W.]
+# Last Modified: 2024-Mar-28 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.6.1"
+readonly LMS_VERSION="0.6.2"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -138,7 +138,7 @@ _CheckForScriptUpdates_()
    fi
    if [ ! -d "$1" ]
    then
-       _PrintMsg_ "\n**ERROR**: INVALID parameter for directory path [$1].\n"
+       _PrintMsg_ "\n**ERROR**: Directory Path [$1] *NOT* FOUND.\n"
        return 1
    fi
    local theVersTextFile="${1}/$LMS_VERFILE"
@@ -154,7 +154,7 @@ _CheckForScriptUpdates_()
    curl -kLSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${LMS_SCRIPT_URL}/$LMS_VERFILE" -o "$theVersTextFile"
 
-   if [ ! -s "$theVersTextFile" ] || grep -q "404: Not Found" "$theVersTextFile"
+   if [ ! -s "$theVersTextFile" ] || grep -iq "404: Not Found" "$theVersTextFile"
    then
        rm -f "$theVersTextFile"
        _PrintMsg_ "\n**ERROR**: Could not download the version file [$LMS_VERFILE]\n"
@@ -242,7 +242,7 @@ _DownloadLibraryFile_CEM_()
    "${CEM_LIB_URL}/$CUSTOM_EMAIL_LIBName" -o "$CUSTOM_EMAIL_LIBFile"
    curlCode="$?"
 
-   if [ "$curlCode" -eq 0 ] && [ -f "$CUSTOM_EMAIL_LIBFile" ]
+   if [ "$curlCode" -eq 0 ] && [ -s "$CUSTOM_EMAIL_LIBFile" ]
    then
        retCode=0
        chmod 755 "$CUSTOM_EMAIL_LIBFile"
