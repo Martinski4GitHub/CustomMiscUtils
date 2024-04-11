@@ -10,8 +10,8 @@
 # section.
 #
 # Creation Date: 2021-Jan-24 [Martinski W.]
-# Last Modified: 2024-Mar-09 [Martinski W.]
-# Version: 0.7.11
+# Last Modified: 2024-Apr-10 [Martinski W.]
+# Version: 0.7.12
 ######################################################################
 set -u
 
@@ -33,7 +33,9 @@ readonly NVRAM_VarsBackupSTAname="NVRAM_CustomBackupStatus.txt"
 readonly NVRAM_Directory="${theJFFSdir}/nvram"
 readonly NVRAM_TempDIRname="nvramTempBackup"
 readonly NVRAM_TempDIRpath="${theTEMPdir}/$NVRAM_TempDIRname"
-readonly NVRAM_TempDIRfilesMatch="${NVRAM_TempDIRpath}/NVRAMvar_*.TMP"
+readonly NVRAM_TempFilesMatch="${NVRAM_TempDIRpath}/NVRAMvar_*.TMP"
+readonly NVRAM_TempShowVarFle="${NVRAM_TempDIRpath}/NVRAMshowVars.TMP"
+readonly NVRAM_TempShowFilter="([0-3]:.*|ASUS_EULA_time=|TM_EULA_time=|sys_uptime_now=)"
 
 readonly NVRAM_ConfigVarPrefix="NVRAM_"
 readonly NVRAM_DefUserBackupDir="/opt/var/$NVRAM_VarsBackupDIRname"
@@ -676,7 +678,7 @@ _NVRAM_VarSetKeyInfo_()
 #------------------------------------------------------------------#
 _NVRAM_VarSaveKeyValue_()
 {
-   local NVRAM_SavedOK=false
+   local theKeyValue  NVRAM_SavedOK=false
 
    if [ -f "${NVRAM_Directory}/$NVRAM_VarKeyName" ]
    then
@@ -684,9 +686,9 @@ _NVRAM_VarSaveKeyValue_()
        then NVRAM_SavedOK=true ; fi
    fi
 
-   if nvram show 2>/dev/null | grep -qE "^${NVRAM_VarKeyName}="
+   if grep -qE "^${NVRAM_VarKeyName}=" "$NVRAM_TempShowVarFle"
    then
-       theKeyValue="$(nvram get "$NVRAM_VarKeyName")"
+       theKeyValue="$(grep -m1 -E "^${NVRAM_VarKeyName}=" "$NVRAM_TempShowVarFle" | awk -F '=' '{print $2}')"
        echo "$theKeyValue" > "$NVRAM_KeyVARsaved"
        NVRAM_SavedOK=true
    fi
@@ -839,6 +841,7 @@ _SaveAllVarsToBackup_()
        _NVRAM_UpdateCustomBackupConfig_ SAVED "$theFilePath" STATUSupdate
        _PrintMsg0_ "\nNVRAM variables were successfully saved in:\n[${GRNct}${theFilePath}${NOct}]\n"
    fi
+
    _NVRAM_CleanupTempFiles_ -ALL
    _CheckForMaxBackupFiles_ true
    return "$retCode"
@@ -854,7 +857,7 @@ _NVRAM_GetKeyNamesFromRegExp_()
        _PrintError_ "NVRAM variable key names Regular Expression \"${REDct}${1}${NOct}\" is INVALID."
        return 1
    fi
-   if ! nvram show 2>/dev/null | grep -qE "^${1}="
+   if ! grep -qE "^${1}=" "$NVRAM_TempShowVarFle"
    then
        _PrintError_ "NVRAM variable key names NOT FOUND using \"${REDct}${1}${NOct}\" Regular Expression."
        return 1
@@ -871,7 +874,7 @@ _NVRAM_GetKeyNamesFromRegExp_()
       then nvramVarOKCount="$((nvramVarOKCount + 1))" ; fi
       lastKeyNameStr="$theKeyNameStr"
    done <<EOT
-$(nvram show 2>/dev/null | grep -E "^${1}=" | sort -d -t '=' -k 1)
+$(grep -E "^${1}=" "$NVRAM_TempShowVarFle" | sort -d -t '=' -k 1)
 EOT
 }
 
@@ -893,6 +896,12 @@ _SaveVarsFromUserList_()
    ! "$isVerbose" && _PrintMsg0_ "\nStart backup process.\n"
 
    _NVRAM_CleanupTempFiles_ -ALL
+
+   if [ ! -d "$NVRAM_TempDIRpath" ]
+   then mkdir -m 755 "$NVRAM_TempDIRpath" 2>/dev/null ; fi
+
+   # Create temporary file showing current NVRAM variables #
+   nvram show 2>/dev/null | grep -vE "^$NVRAM_TempShowFilter" | sort -d -t '=' -k 1 > "$NVRAM_TempShowVarFle"
 
    inputListCount=0
    nvramVarOKCount=0
@@ -935,6 +944,9 @@ _SaveVarsFromUserList_()
    done < "$nvramVarsListFilePath"
 
    ! "$isVerbose" && _PrintMsg0_ "\n"
+
+   # Delete temporary file showing current NVRAM variables #
+   rm -f "$NVRAM_TempShowVarFle"
 
    if [ "$nvramVarOKCount" -gt 0 ]
    then
@@ -1079,7 +1091,7 @@ EOT
 _NVRAM_VarRestoreKeysFromBackup_()
 {
    local tempFileCount
-   tempFileCount="$(_list2_ -1 "$NVRAM_TempDIRfilesMatch" 2>/dev/null | wc -l)"
+   tempFileCount="$(_list2_ -1 "$NVRAM_TempFilesMatch" 2>/dev/null | wc -l)"
    if [ ! -d "$NVRAM_TempDIRpath" ] || [ "$tempFileCount" -eq 0 ]
    then
        _PrintError_ "Backup file(s) in [${REDct}${NVRAM_TempDIRpath}${NOct}] NOT FOUND."
@@ -1103,7 +1115,7 @@ _NVRAM_VarRestoreKeysFromBackup_()
       if _NVRAM_VarRestoreKeyValue_
       then nvramVarOKCount="$((nvramVarOKCount + 1))" ; fi
    done <<EOT
-$(_list2_ -1 "$NVRAM_TempDIRfilesMatch" 2>/dev/null)
+$(_list2_ -1 "$NVRAM_TempFilesMatch" 2>/dev/null)
 EOT
 
    if [ "$nvramVarOKCount" -gt 0 ] || "$NVRAM_VarFoundOK"
@@ -1171,6 +1183,7 @@ EOT
            _PrintMsg0_ "NVRAM variables were restored ${GRNct}successfully${NOct}.\n"
        fi
    fi
+
    _NVRAM_CleanupTempFiles_ -ALL
 
    ! "$isVerbose" && _PrintMsg0_ "\n"
