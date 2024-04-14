@@ -9,19 +9,23 @@
 # and the current top 10 processes based on "VSZ" size for
 # context and to capture any correlation between the stats.
 #
+# EXAMPLE CALL:
 #   LogMemoryStats.sh  [kb|KB|mb|MB]
-#   LogMemoryStats.sh  -updateCheck "/directory/path" [-quiet]
 #
 # The *OPTIONAL* parameter indicates whether to keep track of
-# file/directory sizes in KByte or MByte. Since we're usually
+# file/directory sizes in KBytes or MBytes. Since we're usually
 # looking for unexpected large files, we filter out < 750KBytes.
 # If no parameter is given the default is the "Human Readable"
 # format.
 #
-# The script also sends email notifications when some defined
-# thresholds are reached for the CPU temperature, JFFS usage
-# and "tmpfs" usage. This works ONLY *IF* the AMTM email
-# configuration file has been previously set up already.
+# The script can also send email notifications when specific
+# pre-defined thresholds are reached for the CPU temperature,
+# JFFS usage and "tmpfs" usage. This works ONLY *IF* the
+# AMTM email configuration file has been previously set up
+# already.
+#
+# Call to check for script version updates:
+#   LogMemoryStats.sh  -updateCheck [-quiet]
 #
 # FOR DIAGNOSTICS PURPOSES:
 # -------------------------
@@ -34,11 +38,11 @@
 # cru a LogMemStats "*/30 * * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Mar-28 [Martinski W.]
+# Last Modified: 2024-Apr-12 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.6.2"
+readonly LMS_VERSION="0.6.3"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -1002,7 +1006,7 @@ _CPU_Temperature_()
 if [ $# -gt 0 ] && [ "$1" = "-updateCheck" ]
 then
     shift
-    _CheckForScriptUpdates_ "$@"
+    _CheckForScriptUpdates_ "$(pwd)" "$@"
     exit $?
 fi
 
@@ -1015,7 +1019,7 @@ then
    . "$CUSTOM_EMAIL_LIBFile"
 
    if [ -z "${CEM_LIB_VERSION:+xSETx}" ] || \
-      _CheckLibraryUpdates_CEM_ "$CUSTOM_EMAIL_LIBDir" -quiet
+       _CheckLibraryUpdates_CEM_ "$CUSTOM_EMAIL_LIBDir" -quiet
    then
        _DownloadLibraryFile_CEM_ "update"
    fi
@@ -1026,9 +1030,9 @@ fi
 [ -n "${amtmIsEMailConfigFileEnabled:+xSETx}" ] && \
 routerMODEL_ID="$(_GetRouterModelID_CEM_)"
 
-##------------------------------##
-## FOR TEST/DEBUG PURPOSES ONLY ##
-##------------------------------##
+##-------------------------------------##
+## FOR TESTING/DEBUGGING PURPOSES ONLY ##
+##-------------------------------------##
 if [ $# -gt 0 ] && [ -n "$1" ]
 then
     case "$1" in
