@@ -11,11 +11,11 @@
 # the variable names.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Mar-28 [Martinski W.]
+# Last Modified: 2024-Apr-13 [Martinski W.]
 ####################################################################
 set -u
 
-TEST_VERSION="0.5.10"
+TEST_VERSION="0.5.11"
 
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
@@ -61,7 +61,7 @@ then
    . "$CUSTOM_EMAIL_LIBFile"
 
    if [ -z "${CEM_LIB_VERSION:+xSETx}" ] || \
-      _CheckLibraryUpdates_CEM_ "$CUSTOM_EMAIL_LIBDir"
+       _CheckLibraryUpdates_CEM_ "$CUSTOM_EMAIL_LIBDir" -quiet
    then
        _DownloadCEMLibraryFile_ "update"
    fi
