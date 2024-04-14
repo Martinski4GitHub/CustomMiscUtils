@@ -29,13 +29,13 @@
 #
 # FOR DIAGNOSTICS PURPOSES:
 # -------------------------
-# Set a cron job to periodically monitor & log RAM usage stats
-# every 30 minutes or every hour to check for any "trends" in
-# rapid and unusual peaks in RAM usage, especially unexpected
-# large files found stored in "tmpfs" (or "jffs") filesystem.
+# Set up a cron job to periodically monitor and log RAM usage
+# stats every 1 or 2 hours to check for any "trends" in unusual
+# increases in RAM usage, especially if unexpected large files
+# are being created/stored in "tmpfs" (or "jffs") filesystem.
 #
 # EXAMPLE:
-# cru a LogMemStats "*/30 * * * * /jffs/scripts/LogMemoryStats.sh"
+# cru a LogMemStats "0 */2 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
 # Last Modified: 2024-Apr-12 [Martinski W.]
