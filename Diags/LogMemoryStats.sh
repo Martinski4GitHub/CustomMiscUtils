@@ -30,19 +30,19 @@
 # FOR DIAGNOSTICS PURPOSES:
 # -------------------------
 # Set up a cron job to periodically monitor and log RAM usage
-# stats every 1 or 2 hours to check for any "trends" in unusual
+# stats every 3 to 6 hours to check for any "trends" in unusual
 # increases in RAM usage, especially if unexpected large files
 # are being created/stored in "tmpfs" (or "jffs") filesystem.
 #
 # EXAMPLE:
-# cru a LogMemStats "0 */2 * * * /jffs/scripts/LogMemoryStats.sh"
+# cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Apr-12 [Martinski W.]
+# Last Modified: 2024-Apr-14 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.6.3"
+readonly LMS_VERSION="0.6.4"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -268,11 +268,15 @@ _CreateConfigurationFile_()
    [ ! -d "$logMemStatsCFGdir" ] && return 1
 
    {
+     echo "## $(date +'%Y-%b-%d, %I:%M:%S %p %Z') ##"
      echo "maxLogFileSizeKB=$DEF_LogFileSizeKB"
      echo "userLogDirectoryPath=\"${defLogDirectoryPath}\""
      echo "prefLogDirectoryPath=\"${defLogDirectoryPath}\""
+     echo "cpuEnableEmailNotifications=true"
      echo "cpuLastEmailNotificationTime=0_INIT"
+     echo "jffsEnableEmailNotifications=true"
      echo "jffsLastEmailNotificationTime=0_INIT"
+     echo "tmpfsEnableEmailNotifications=true"
      echo "tmpfsLastEmailNotificationTime=0_INIT"
      echo "isSendEmailNotificationsEnabled=false"
    } > "$logMemStatsCFGfile"
@@ -288,38 +292,57 @@ _ValidateConfigurationFile_()
 {
    [ ! -f "$logMemStatsCFGfile" ] && return 1
 
+   if ! grep -qE "^## [0-9]+[-].* ##$" "$logMemStatsCFGfile"
+   then
+       sed -i "1 i $dateTimeStr" "$logMemStatsCFGfile"
+   fi
    if ! grep -q "^maxLogFileSizeKB=" "$logMemStatsCFGfile"
    then
-       sed -i "1 i maxLogFileSizeKB=$DEF_LogFileSizeKB" "$logMemStatsCFGfile"
+       sed -i "2 i maxLogFileSizeKB=$DEF_LogFileSizeKB" "$logMemStatsCFGfile"
    fi
    if ! grep -q "^userLogDirectoryPath=" "$logMemStatsCFGfile"
    then
-       sed -i "2 i userLogDirectoryPath=\"${defLogDirectoryPath}\"" "$logMemStatsCFGfile"
+       sed -i "3 i userLogDirectoryPath=\"${defLogDirectoryPath}\"" "$logMemStatsCFGfile"
        retCode=1
    fi
    if ! grep -q "^prefLogDirectoryPath=" "$logMemStatsCFGfile"
    then
-       sed -i "3 i prefLogDirectoryPath=\"${defLogDirectoryPath}\"" "$logMemStatsCFGfile"
+       sed -i "4 i prefLogDirectoryPath=\"${defLogDirectoryPath}\"" "$logMemStatsCFGfile"
+       retCode=1
+   fi
+   if ! grep -q "^cpuEnableEmailNotifications=" "$logMemStatsCFGfile"
+   then
+       sed -i "5 i cpuEnableEmailNotifications=true" "$logMemStatsCFGfile"
        retCode=1
    fi
    if ! grep -q "^cpuLastEmailNotificationTime=" "$logMemStatsCFGfile"
    then
-       sed -i "4 i cpuLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
+       sed -i "6 i cpuLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
+       retCode=1
+   fi
+   if ! grep -q "^jffsEnableEmailNotifications=" "$logMemStatsCFGfile"
+   then
+       sed -i "7 i jffsEnableEmailNotifications=true" "$logMemStatsCFGfile"
        retCode=1
    fi
    if ! grep -q "^jffsLastEmailNotificationTime=" "$logMemStatsCFGfile"
    then
-       sed -i "5 i jffsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
+       sed -i "8 i jffsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
+       retCode=1
+   fi
+   if ! grep -q "^tmpfsEnableEmailNotifications=" "$logMemStatsCFGfile"
+   then
+       sed -i "9 i tmpfsEnableEmailNotifications=true" "$logMemStatsCFGfile"
        retCode=1
    fi
    if ! grep -q "^tmpfsLastEmailNotificationTime=" "$logMemStatsCFGfile"
    then
-       sed -i "6 i tmpfsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
+       sed -i "10 i tmpfsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
        retCode=1
    fi
    if ! grep -q "^isSendEmailNotificationsEnabled=" "$logMemStatsCFGfile"
    then
-       sed -i "7 i isSendEmailNotificationsEnabled=false" "$logMemStatsCFGfile"
+       sed -i "11 i isSendEmailNotificationsEnabled=false" "$logMemStatsCFGfile"
        retCode=1
    fi
 }
@@ -357,6 +380,15 @@ _SetConfigurationOption_()
             ;;
        prefLogDirectoryPath)
             prefLogDirectoryPath="$2"
+            ;;
+       cpuEnableEmailNotifications)
+            cpuEnableEmailNotifications="$2"
+            ;;
+       jffsEnableEmailNotifications)
+            jffsEnableEmailNotifications="$2"
+            ;;
+       tmpfsEnableEmailNotifications)
+            tmpfsEnableEmailNotifications="$2"
             ;;
        isSendEmailNotificationsEnabled)
             isSendEmailNotificationsEnabled="$2"
@@ -416,44 +448,46 @@ _CheckConfigurationFile_()
 }
 
 #-----------------------------------------------------------------------#
-# CPU Temperature Thresholds [Celsius]
-# >> 92 = Red Alert Level 2 [2 hrs].
-# >> 88 = Red Alert Level 1 [12 hrs].
-# >> 86 = Yellow Warning Level 1 [24 hrs].
-# <= 86 = Green OK.
+# CPU Celsius Temperature Thresholds
+# >> 92 = Red Alert Level 3 [6 hrs]
+# >> 90 = Red Alert Level 2 [12 hrs]
+# >> 88 = Red Alert Level 1 [24 hrs]
+# >> 86 = Yellow Warning Level 1 [48 hrs]
+# <= 86 = Green OK
 #-----------------------------------------------------------------------#
 cpuTemperatureCelsius=""
 cpuTempThresholdTestOnly=false
 readonly cpuThermalThresholdTestOnly=10
-readonly cpuThermalThresholdWarning1=86   ##OK=86, DEBUG:66##
-readonly cpuThermalThresholdRedAlert1=88  ##OK=88, DEBUG:70##
-readonly cpuThermalThresholdRedAlert2=92  ##OK=92, DEBUG:72##
+readonly cpuThermalThresholdWarning1=86
+readonly cpuThermalThresholdRedAlert1=88
+readonly cpuThermalThresholdRedAlert2=90
+readonly cpuThermalThresholdRedAlert3=92
 
 #-----------------------------------------------------------------------#
-# JFFS Filesystem Usage Thresholds [Percentage]
-# >> 80% Used = Red Alert Level 3 [2 hrs].
-# >> 75% Used = Red Alert Level 2 [6 hrs].
-# >> 70% Used = Red Alert Level 1 [12 hrs].
-# >> 60% Used = Yellow Warning Level 2 [24 hrs].
-# >> 50% Used = Yellow Warning Level 1 [48 hrs].
-# <= 50% Used = Green OK.
+# JFFS Filesystem Percent Usage Thresholds
+# >> 80% Used = Red Alert Level 3 [6 hrs]
+# >> 75% Used = Red Alert Level 2 [12 hrs]
+# >> 70% Used = Red Alert Level 1 [24 hrs]
+# >> 65% Used = Yellow Warning Level 2 [36 hrs]
+# >> 60% Used = Yellow Warning Level 1 [48 hrs]
+# <= 60% Used = Green OK
 #-----------------------------------------------------------------------#
 jffsUsageThresholdTestOnly=false
 readonly jffsUsedThresholdTestOnly=1
-readonly jffsUsedThresholdWarning1=50
-readonly jffsUsedThresholdWarning2=60
+readonly jffsUsedThresholdWarning1=60
+readonly jffsUsedThresholdWarning2=65
 readonly jffsUsedThresholdRedAlert1=70
 readonly jffsUsedThresholdRedAlert2=75
 readonly jffsUsedThresholdRedAlert3=80
 
 #-----------------------------------------------------------------------#
-# "tmpfs" Filesystem Usage Thresholds [Percentage]
-# More than 90% Used = Red Alert Level 3 [2 hrs].
-# More than 85% Used = Red Alert Level 2 [6 hrs].
-# More than 80% Used = Red Alert Level 1 [12 hrs].
-# More than 75% Used = Yellow Warning Level 2 [24 hrs].
-# More than 70% Used = Yellow Warning Level 1 [48 hrs].
-# Less than 70% Used = Green OK.
+# "tmpfs" Filesystem Percent Usage Thresholds
+# >> 90% Used = Red Alert Level 3 [6 hrs]
+# >> 85% Used = Red Alert Level 2 [12 hrs]
+# >> 80% Used = Red Alert Level 1 [24 hrs]
+# >> 75% Used = Yellow Warning Level 2 [36 hrs]
+# >> 70% Used = Yellow Warning Level 1 [48 hrs]
+# <= 70% Used = Green OK
 #-----------------------------------------------------------------------#
 tmpfsUsageThresholdTestOnly=false
 readonly tmpfsUsedThresholdTestOnly=0
@@ -463,12 +497,15 @@ readonly tmpfsUsedThresholdRedAlert1=80
 readonly tmpfsUsedThresholdRedAlert2=85
 readonly tmpfsUsedThresholdRedAlert3=90
 
-#------------------------------
-# To send email notifications
-#------------------------------
+#-------------------------------------
+# To send email notifications alerts
+#-------------------------------------
 onehrSecs=3600
+cpuEnableEmailNotifications=true
 cpuLastEmailNotificationTime="0_INIT"
+jffsEnableEmailNotifications=true
 jffsLastEmailNotificationTime="0_INIT"
+tmpfsEnableEmailNotifications=true
 tmpfsLastEmailNotificationTime="0_INIT"
 isSendEmailNotificationsEnabled=false
 
@@ -498,7 +535,7 @@ _CreateEMailContent_()
            ;;
        CPU_TEMP_Warning1)
            timeStampID=cpu
-           minTimeDiffSecs="$((onehrSecs * 24))"
+           minTimeDiffSecs="$((onehrSecs * 48))"
            nextTimeStampTag=YLW1
            emailSubject="Router CPU Temperature WARNING"
            emailBodyTitle="CPU Temperature: ${2}°C"
@@ -509,7 +546,7 @@ _CreateEMailContent_()
            ;;
        CPU_TEMP_RedAlert1)
            timeStampID=cpu
-           minTimeDiffSecs="$((onehrSecs * 12))"
+           minTimeDiffSecs="$((onehrSecs * 24))"
            nextTimeStampTag=RED1
            emailSubject="Router CPU Temperature ALERT"
            emailBodyTitle="CPU Temperature: ${2}°C"
@@ -520,13 +557,24 @@ _CreateEMailContent_()
            ;;
        CPU_TEMP_RedAlert2)
            timeStampID=cpu
-           minTimeDiffSecs="$((onehrSecs * 2))"
+           minTimeDiffSecs="$((onehrSecs * 12))"
            nextTimeStampTag=RED2
            emailSubject="Router CPU Temperature ALERT"
            emailBodyTitle="CPU Temperature: ${2}°C"
            {
              printf "<b>**ALERT**</b>\n"
              printf "Router CPU temperature of <b>${2}°C</b> exceeds <b>${cpuThermalThresholdRedAlert2}°C</b>.\n"
+           } > "$tmpEMailBodyFile"
+           ;;
+       CPU_TEMP_RedAlert3)
+           timeStampID=cpu
+           minTimeDiffSecs="$((onehrSecs * 6))"
+           nextTimeStampTag=RED3
+           emailSubject="Router CPU Temperature ALERT"
+           emailBodyTitle="CPU Temperature: ${2}°C"
+           {
+             printf "<b>**ALERT**</b>\n"
+             printf "Router CPU temperature of <b>${2}°C</b> exceeds <b>${cpuThermalThresholdRedAlert3}°C</b>.\n"
            } > "$tmpEMailBodyFile"
            ;;
        JFFS_USED_TestOnly)
@@ -557,7 +605,7 @@ _CreateEMailContent_()
            ;;
        JFFS_USED_Warning2)
            timeStampID=jffs
-           minTimeDiffSecs="$((onehrSecs * 24))"
+           minTimeDiffSecs="$((onehrSecs * 36))"
            nextTimeStampTag=YLW2
            emailSubject="Router JFFS Usage WARNING"
            emailBodyTitle="JFFS Usage: ${2}%"
@@ -570,7 +618,7 @@ _CreateEMailContent_()
            ;;
        JFFS_USED_RedAlert1)
            timeStampID=jffs
-           minTimeDiffSecs="$((onehrSecs * 12))"
+           minTimeDiffSecs="$((onehrSecs * 24))"
            nextTimeStampTag=RED1
            emailSubject="Router JFFS Usage ALERT"
            emailBodyTitle="JFFS Usage: ${2}%"
@@ -583,7 +631,7 @@ _CreateEMailContent_()
            ;;
        JFFS_USED_RedAlert2)
            timeStampID=jffs
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$((onehrSecs * 12))"
            nextTimeStampTag=RED2
            emailSubject="Router JFFS Usage ALERT"
            emailBodyTitle="JFFS Usage: ${2}%"
@@ -596,7 +644,7 @@ _CreateEMailContent_()
            ;;
        JFFS_USED_RedAlert3)
            timeStampID=jffs
-           minTimeDiffSecs="$((onehrSecs * 2))"
+           minTimeDiffSecs="$((onehrSecs * 6))"
            nextTimeStampTag=RED3
            emailSubject="Router JFFS Usage ALERT"
            emailBodyTitle="JFFS Usage: ${2}%"
@@ -635,7 +683,7 @@ _CreateEMailContent_()
            ;;
        TMPFS_USED_Warning2)
            timeStampID=tmpfs
-           minTimeDiffSecs="$((onehrSecs * 24))"
+           minTimeDiffSecs="$((onehrSecs * 36))"
            nextTimeStampTag=YLW2
            emailSubject="Router TMPFS Usage WARNING"
            emailBodyTitle="TMPFS Usage: ${2}%"
@@ -648,7 +696,7 @@ _CreateEMailContent_()
            ;;
        TMPFS_USED_RedAlert1)
            timeStampID=tmpfs
-           minTimeDiffSecs="$((onehrSecs * 12))"
+           minTimeDiffSecs="$((onehrSecs * 24))"
            nextTimeStampTag=RED1
            emailSubject="Router TMPFS Usage ALERT"
            emailBodyTitle="TMPFS Usage: ${2}%"
@@ -661,7 +709,7 @@ _CreateEMailContent_()
            ;;
        TMPFS_USED_RedAlert2)
            timeStampID=tmpfs
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$((onehrSecs * 12))"
            nextTimeStampTag=RED2
            emailSubject="Router TMPFS Usage ALERT"
            emailBodyTitle="TMPFS Usage: ${2}%"
@@ -674,7 +722,7 @@ _CreateEMailContent_()
            ;;
        TMPFS_USED_RedAlert3)
            timeStampID=tmpfs
-           minTimeDiffSecs="$((onehrSecs * 2))"
+           minTimeDiffSecs="$((onehrSecs * 6))"
            nextTimeStampTag=RED3
            emailSubject="Router TMPFS Usage ALERT"
            emailBodyTitle="TMPFS Usage: ${2}%"
@@ -913,8 +961,7 @@ _CheckUsageThresholdsTMPFS_()
 #-----------------------------------------------------------------------#
 _CheckTemperatureThresholdsCPU_()
 {
-   if [ $# -eq 0 ] || [ -z "$1" ] || \
-      ! echo "$1" | grep -qE '^[1-9]+[.]?[0-9]+$'
+   if ! echo "$cpuTemperatureCelsius" | grep -qE '^[1-9]+[.]?[0-9]+$'
    then return 1 ; fi
 
    _TempInteger_()
@@ -926,13 +973,18 @@ _CheckTemperatureThresholdsCPU_()
    local doConfigUpdate  tempIntgr  tempFloat
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
 
-   tempIntgr="$(_TempInteger_ "($1 * 10)")"
-   tempFloat="$(printf "%.1f" "$1")"
+   tempIntgr="$(_TempInteger_ "($cpuTemperatureCelsius * 10)")"
+   tempFloat="$(printf "%.1f" "$cpuTemperatureCelsius")"
 
    if "$cpuTempThresholdTestOnly" && \
       [ "$tempIntgr" -gt "${cpuThermalThresholdTestOnly}9" ]
    then
        _SendEMailNotification_ CPU_TEMP_TestOnly "$tempFloat"
+       return 0
+   fi
+   if [ "$tempIntgr" -gt "${cpuThermalThresholdRedAlert3}9" ]
+   then
+       _SendEMailNotification_ CPU_TEMP_RedAlert3 "$tempFloat"
        return 0
    fi
    if [ "$tempIntgr" -gt "${cpuThermalThresholdRedAlert2}9" ]
@@ -986,7 +1038,7 @@ _Get_CPU_Temp_Thermal_()
    rawTemp="$(cat "$CPU_TempThermal")"
    cpuTemp="$((rawTemp / 1000)).$(printf "%03d" "$((rawTemp % 1000))")"
    cpuTemperatureCelsius="$cpuTemp"
-   printf "CPU Temperature: ${cpuTemp}°C\n"
+   printf "CPU Temperature: $(printf "%.2f" "$cpuTemp")°C\n"
 }
 
 #-----------------------------------------------------------------------#
@@ -1082,9 +1134,9 @@ _PrintMsg_ "\nLog entry was added to:\n${scriptLogFPath}\n\n"
 
 if "$isSendEmailNotificationsEnabled"
 then
-   _CheckUsageThresholdsJFFS_
-   _CheckUsageThresholdsTMPFS_
-   _CheckTemperatureThresholdsCPU_ "$cpuTemperatureCelsius"
+   "$cpuEnableEmailNotifications" && _CheckTemperatureThresholdsCPU_
+   "$jffsEnableEmailNotifications" && _CheckUsageThresholdsJFFS_
+   "$tmpfsEnableEmailNotifications" && _CheckUsageThresholdsTMPFS_
 fi
 
 exit 0
