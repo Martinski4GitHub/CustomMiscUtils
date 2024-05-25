@@ -7,7 +7,8 @@
 #
 # It also takes snapshots of file/directory usage in JFFS,
 # and the current top 10 processes based on "VSZ" size for
-# context and to capture any correlation between the stats.
+# context and to capture any correlation between the usage
+# stats.
 #
 # EXAMPLE CALL:
 #   LogMemoryStats.sh  [kb|KB|mb|MB]
@@ -18,11 +19,19 @@
 # If no parameter is given the default is the "Human Readable"
 # format.
 #
-# The script can also send email notifications when specific
+# EMAIL NOTIFICATIONS:
+# --------------------
+#   LogMemoryStats.sh -enableEmailNotification
+#   LogMemoryStats.sh -disableEmailNotification
+#
+# The above calls allow you to toggle sending email notifications.
+# This feature requires having the AMTM email configuration option
+# already set up prior to sending emails via this script.
+#
+# If enabled, script will send email notifications when specific
 # pre-defined thresholds are reached for the CPU temperature,
-# JFFS usage and "tmpfs" usage. This works ONLY *IF* the
-# AMTM email configuration file has been previously set up
-# already.
+# "JFFS" usage and "tmpfs" usage. Again, this works ONLY *IF*
+# the AMTM email configuration option has been already set up.
 #
 # Call to check for script version updates:
 #   LogMemoryStats.sh  -updateCheck [-quiet]
@@ -38,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Apr-14 [Martinski W.]
+# Last Modified: 2024-May-22 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.6.4"
+readonly LMS_VERSION="0.6.5"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -435,7 +444,7 @@ _InitConfigurationSettings_()
    if [ "$isSendEmailNotificationsEnabled" != "true" ] && \
       [ "$isSendEmailNotificationsEnabled" != "false" ]
    then
-       _SetConfigurationOption_ isSendEmailNotificationsEnabled true
+       _SetConfigurationOption_ isSendEmailNotificationsEnabled false
    fi
 }
 
@@ -849,9 +858,65 @@ _InfoHRdu_()
 }
 
 #-----------------------------------------------------------------------#
-_CheckUsageThresholdsJFFS_()
+_JFFS_MailUsageNotification_()
 {
-   local jffsInfo  percentNum  doConfigUpdate
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || \
+      ! "$isSendEmailNotificationsEnabled" || \
+      ! "$jffsEnableEmailNotifications"
+   then return 1 ; fi
+
+   _SendEMailNotification_ "$@"
+}
+
+#-----------------------------------------------------------------------#
+_JFFS_ShowUsageNotification_()
+{
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
+   then return 1 ; fi
+
+   local logMsg  theUsageThreshold
+
+   case "$1" in
+       JFFS_USED_TestOnly)
+           theUsageThreshold="$jffsUsedThresholdTestOnly"
+           logMsg="This notification is for **TESTING** purposes ONLY."
+           ;;
+       JFFS_USED_Warning1)
+           theUsageThreshold="$jffsUsedThresholdWarning1"
+           logMsg="**WARNING**"
+           ;;
+       JFFS_USED_Warning2)
+           theUsageThreshold="$jffsUsedThresholdWarning2"
+           logMsg="**WARNING**"
+           ;;
+       JFFS_USED_RedAlert1)
+           theUsageThreshold="$jffsUsedThresholdRedAlert1"
+           logMsg="**ALERT**"
+           ;;
+       JFFS_USED_RedAlert2)
+           theUsageThreshold="$jffsUsedThresholdRedAlert2"
+           logMsg="**ALERT**"
+           ;;
+       JFFS_USED_RedAlert3)
+           theUsageThreshold="$jffsUsedThresholdRedAlert3"
+           logMsg="**ALERT**"
+           ;;
+       *) _PrintMsg_ "\n**ERROR**: UNKNOWN JFFS Usage Parameter [$1]\n"
+           return 1
+           ;;
+   esac
+   {
+     printf "\n${logMsg}\n"
+     printf "JFFS usage of ${2}%% exceeds ${theUsageThreshold}%%."
+     printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+     printf "\n%s\n" "$3"
+   } >> "$tempLogFPath"
+}
+
+#-----------------------------------------------------------------------#
+_CheckUsageThresholds_JFFS_()
+{
+   local jffsInfo  percentNum=0  doConfigUpdate
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
 
    jffsInfo="$(df -hT /jffs | grep -E '^/dev/.* [[:blank:]]+jffs.*[[:blank:]]+/jffs$')"
@@ -862,32 +927,38 @@ _CheckUsageThresholdsJFFS_()
    if "$jffsUsageThresholdTestOnly" && \
       [ "$percentNum" -gt "$jffsUsedThresholdTestOnly" ]
    then
-       _SendEMailNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsInfo"
+       _JFFS_MailUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert3" ]
    then
-       _SendEMailNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsInfo"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert2" ]
    then
-       _SendEMailNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsInfo"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert1" ]
    then
-       _SendEMailNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsInfo"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdWarning2" ]
    then
-       _SendEMailNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsInfo"
+       _JFFS_MailUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdWarning1" ]
    then
-       _SendEMailNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsInfo"
+       _JFFS_MailUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsInfo"
        return 0
    fi
 
@@ -904,9 +975,66 @@ _CheckUsageThresholdsJFFS_()
 }
 
 #-----------------------------------------------------------------------#
-_CheckUsageThresholdsTMPFS_()
+_TMPFS_MailUsageNotification_()
 {
-   local tmpfsInfo  percentNum  doConfigUpdate
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || \
+      ! "$isSendEmailNotificationsEnabled" || \
+      ! "$tmpfsEnableEmailNotifications"
+   then return 1 ; fi
+
+   _SendEMailNotification_ "$@"
+}
+
+#-----------------------------------------------------------------------#
+_TMPFS_ShowUsageNotification_()
+{
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
+   then return 1 ; fi
+
+   local logMsg  theUsageThreshold
+
+   case "$1" in
+       TMPFS_USED_TestOnly)
+           theUsageThreshold="$tmpfsUsedThresholdTestOnly"
+           logMsg="This notification is for **TESTING** purposes ONLY."
+           ;;
+       TMPFS_USED_Warning1)
+           theUsageThreshold="$tmpfsUsedThresholdWarning1"
+           logMsg="**WARNING**"
+           ;;
+       TMPFS_USED_Warning2)
+           theUsageThreshold="$tmpfsUsedThresholdWarning2"
+           logMsg="**WARNING**"
+           ;;
+       TMPFS_USED_RedAlert1)
+           theUsageThreshold="$tmpfsUsedThresholdRedAlert1"
+           logMsg="**ALERT**"
+           ;;
+       TMPFS_USED_RedAlert2)
+           theUsageThreshold="$tmpfsUsedThresholdRedAlert2"
+           logMsg="**ALERT**"
+           ;;
+       TMPFS_USED_RedAlert3)
+           theUsageThreshold="$tmpfsUsedThresholdRedAlert3"
+           logMsg="**ALERT**"
+           ;;
+       *) _PrintMsg_ "\n**ERROR**: UNKNOWN TMPFS Usage Parameter [$1]\n"
+           return 1
+           ;;
+   esac
+   {
+     printf "\n${logMsg}\n"
+     printf "TMPFS usage of ${2}%% exceeds ${theUsageThreshold}%%."
+     printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+     printf "\n%s\n" "$3"
+   } >> "$tempLogFPath"
+   return 0
+}
+
+#-----------------------------------------------------------------------#
+_CheckUsageThresholds_TMPFS_()
+{
+   local tmpfsInfo  percentNum=0  doConfigUpdate
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
 
    tmpfsInfo="$(df -hT | grep -E '^tmpfs[[:blank:]]+tmpfs .*[[:blank:]]+/tmp$')"
@@ -917,32 +1045,38 @@ _CheckUsageThresholdsTMPFS_()
    if "$tmpfsUsageThresholdTestOnly" && \
       [ "$percentNum" -gt "$tmpfsUsedThresholdTestOnly" ]
    then
-       _SendEMailNotification_ TMPFS_USED_TestOnly "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_TestOnly "$percentNum" "$tmpfsInfo"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_TestOnly "$percentNum" "$tmpfsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdRedAlert3" ]
    then
-       _SendEMailNotification_ TMPFS_USED_RedAlert3 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert3 "$percentNum" "$tmpfsInfo"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert3 "$percentNum" "$tmpfsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdRedAlert2" ]
    then
-       _SendEMailNotification_ TMPFS_USED_RedAlert2 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert2 "$percentNum" "$tmpfsInfo"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert2 "$percentNum" "$tmpfsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdRedAlert1" ]
    then
-       _SendEMailNotification_ TMPFS_USED_RedAlert1 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert1 "$percentNum" "$tmpfsInfo"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert1 "$percentNum" "$tmpfsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdWarning2" ]
    then
-       _SendEMailNotification_ TMPFS_USED_Warning2 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_Warning2 "$percentNum" "$tmpfsInfo"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_Warning2 "$percentNum" "$tmpfsInfo"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdWarning1" ]
    then
-       _SendEMailNotification_ TMPFS_USED_Warning1 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_Warning1 "$percentNum" "$tmpfsInfo"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_Warning1 "$percentNum" "$tmpfsInfo"
        return 0
    fi
 
@@ -959,7 +1093,58 @@ _CheckUsageThresholdsTMPFS_()
 }
 
 #-----------------------------------------------------------------------#
-_CheckTemperatureThresholdsCPU_()
+_CPU_MailTemperatureNotification_()
+{
+   if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] || \
+      ! "$isSendEmailNotificationsEnabled" || \
+      ! "$cpuEnableEmailNotifications"
+   then return 1 ; fi
+
+   _SendEMailNotification_ "$@"
+}
+
+#-----------------------------------------------------------------------#
+_CPU_ShowTemperatureNotification_()
+{
+   if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+   then return 1 ; fi
+   
+   local logMsg  cpuThermalThreshold
+
+   case "$1" in
+       CPU_TEMP_TestOnly)
+           cpuThermalThreshold="$cpuThermalThresholdTestOnly"
+           logMsg="This notification is for **TESTING** purposes ONLY."
+           ;;
+       CPU_TEMP_Warning1)
+           cpuThermalThreshold="$cpuThermalThresholdWarning1"
+           logMsg="**WARNING**"
+           ;;
+       CPU_TEMP_RedAlert1)
+           cpuThermalThreshold="$cpuThermalThresholdRedAlert1"
+           logMsg="**ALERT**"
+           ;;
+       CPU_TEMP_RedAlert2)
+           cpuThermalThreshold="$cpuThermalThresholdRedAlert2"
+           logMsg="**ALERT**"
+           ;;
+       CPU_TEMP_RedAlert3)
+           cpuThermalThreshold="$cpuThermalThresholdRedAlert3"
+           logMsg="**ALERT**"
+           ;;
+       *) _PrintMsg_ "\n**ERROR**: UNKNOWN CPU Temperature Parameter [$1]\n"
+           return 1
+           ;;
+   esac
+   {
+     printf "\n${logMsg}\n"
+     printf "CPU temperature of ${2}°C exceeds ${cpuThermalThreshold}°C.\n"
+   } >> "$tempLogFPath"
+   return 0
+}
+
+#-----------------------------------------------------------------------#
+_CheckTemperatureThresholds_CPU_()
 {
    if ! echo "$cpuTemperatureCelsius" | grep -qE '^[1-9]+[.]?[0-9]+$'
    then return 1 ; fi
@@ -979,27 +1164,32 @@ _CheckTemperatureThresholdsCPU_()
    if "$cpuTempThresholdTestOnly" && \
       [ "$tempIntgr" -gt "${cpuThermalThresholdTestOnly}9" ]
    then
-       _SendEMailNotification_ CPU_TEMP_TestOnly "$tempFloat"
+       _CPU_ShowTemperatureNotification_ CPU_TEMP_TestOnly "$tempFloat"
+       _CPU_MailTemperatureNotification_ CPU_TEMP_TestOnly "$tempFloat"
        return 0
    fi
    if [ "$tempIntgr" -gt "${cpuThermalThresholdRedAlert3}9" ]
    then
-       _SendEMailNotification_ CPU_TEMP_RedAlert3 "$tempFloat"
+       _CPU_ShowTemperatureNotification_ CPU_TEMP_RedAlert3 "$tempFloat"
+       _CPU_MailTemperatureNotification_ CPU_TEMP_RedAlert3 "$tempFloat"
        return 0
    fi
    if [ "$tempIntgr" -gt "${cpuThermalThresholdRedAlert2}9" ]
    then
-       _SendEMailNotification_ CPU_TEMP_RedAlert2 "$tempFloat"
+       _CPU_ShowTemperatureNotification_ CPU_TEMP_RedAlert2 "$tempFloat"
+       _CPU_MailTemperatureNotification_ CPU_TEMP_RedAlert2 "$tempFloat"
        return 0
    fi
    if [ "$tempIntgr" -gt "${cpuThermalThresholdRedAlert1}9" ]
    then
-       _SendEMailNotification_ CPU_TEMP_RedAlert1 "$tempFloat"
+       _CPU_ShowTemperatureNotification_ CPU_TEMP_RedAlert1 "$tempFloat"
+       _CPU_MailTemperatureNotification_ CPU_TEMP_RedAlert1 "$tempFloat"
        return 0
    fi
    if [ "$tempIntgr" -gt "${cpuThermalThresholdWarning1}9" ]
    then
-       _SendEMailNotification_ CPU_TEMP_Warning1 "$tempFloat"
+       _CPU_ShowTemperatureNotification_ CPU_TEMP_Warning1 "$tempFloat"
+       _CPU_MailTemperatureNotification_ CPU_TEMP_Warning1 "$tempFloat"
        return 0
    fi
 
@@ -1082,15 +1272,23 @@ fi
 [ -n "${amtmIsEMailConfigFileEnabled:+xSETx}" ] && \
 routerMODEL_ID="$(_GetRouterModelID_CEM_)"
 
-##-------------------------------------##
-## FOR TESTING/DEBUGGING PURPOSES ONLY ##
-##-------------------------------------##
 if [ $# -gt 0 ] && [ -n "$1" ]
 then
     case "$1" in
-        -cputest) cpuTempThresholdTestOnly=true ;;
-       -jffstest) jffsUsageThresholdTestOnly=true ;;
-      -tmpfstest) tmpfsUsageThresholdTestOnly=true ;;
+        -cputest) cpuTempThresholdTestOnly=true  ##TEST ONLY##
+           ;;
+        -jffstest) jffsUsageThresholdTestOnly=true  ##TEST ONLY##
+           ;;
+        -tmpfstest) tmpfsUsageThresholdTestOnly=true  ##TEST ONLY##
+           ;;
+       -enableEmailNotification)
+           _SetConfigurationOption_ isSendEmailNotificationsEnabled true
+           ;;
+       -disableEmailNotification)
+           _SetConfigurationOption_ isSendEmailNotificationsEnabled false
+           ;;
+       *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN Parameter [$1]\n\n"
+          exit 1
     esac
 fi
 
@@ -1127,17 +1325,14 @@ fi
    top -b -n1 | head -n 14
 } > "$tempLogFPath"
 
+_CheckUsageThresholds_JFFS_
+_CheckUsageThresholds_TMPFS_
+_CheckTemperatureThresholds_CPU_
+
 "$isInteractive" && cat "$tempLogFPath"
 cat "$tempLogFPath" >> "$scriptLogFPath"
 rm -f "$tempLogFPath"
 _PrintMsg_ "\nLog entry was added to:\n${scriptLogFPath}\n\n"
-
-if "$isSendEmailNotificationsEnabled"
-then
-   "$cpuEnableEmailNotifications" && _CheckTemperatureThresholdsCPU_
-   "$jffsEnableEmailNotifications" && _CheckUsageThresholdsJFFS_
-   "$tmpfsEnableEmailNotifications" && _CheckUsageThresholdsTMPFS_
-fi
 
 exit 0
 
