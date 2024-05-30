@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-May-22 [Martinski W.]
+# Last Modified: 2024-May-28 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.6.5"
+readonly LMS_VERSION="0.7.0"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -458,36 +458,36 @@ _CheckConfigurationFile_()
 
 #-----------------------------------------------------------------------#
 # CPU Celsius Temperature Thresholds
-# >> 92 = Red Alert Level 3 [6 hrs]
-# >> 90 = Red Alert Level 2 [12 hrs]
-# >> 88 = Red Alert Level 1 [24 hrs]
-# >> 86 = Yellow Warning Level 1 [48 hrs]
-# <= 86 = Green OK
+# >> 94 = Red Alert Level 3 [6 hrs]
+# >> 92 = Red Alert Level 2 [12 hrs]
+# >> 90 = Red Alert Level 1 [24 hrs]
+# >> 88 = Yellow Warning Level 1 [48 hrs]
+# <= 88 = Green OK
 #-----------------------------------------------------------------------#
 cpuTemperatureCelsius=""
 cpuTempThresholdTestOnly=false
 readonly cpuThermalThresholdTestOnly=10
-readonly cpuThermalThresholdWarning1=86
-readonly cpuThermalThresholdRedAlert1=88
-readonly cpuThermalThresholdRedAlert2=90
-readonly cpuThermalThresholdRedAlert3=92
+readonly cpuThermalThresholdWarning1=88
+readonly cpuThermalThresholdRedAlert1=90
+readonly cpuThermalThresholdRedAlert2=92
+readonly cpuThermalThresholdRedAlert3=94
 
 #-----------------------------------------------------------------------#
 # JFFS Filesystem Percent Usage Thresholds
-# >> 80% Used = Red Alert Level 3 [6 hrs]
-# >> 75% Used = Red Alert Level 2 [12 hrs]
-# >> 70% Used = Red Alert Level 1 [24 hrs]
-# >> 65% Used = Yellow Warning Level 2 [36 hrs]
-# >> 60% Used = Yellow Warning Level 1 [48 hrs]
-# <= 60% Used = Green OK
+# >> 85% Used = Red Alert Level 3 [6 hrs]
+# >> 80% Used = Red Alert Level 2 [12 hrs]
+# >> 75% Used = Red Alert Level 1 [24 hrs]
+# >> 70% Used = Yellow Warning Level 2 [36 hrs]
+# >> 65% Used = Yellow Warning Level 1 [48 hrs]
+# <= 65% Used = Green OK
 #-----------------------------------------------------------------------#
 jffsUsageThresholdTestOnly=false
 readonly jffsUsedThresholdTestOnly=1
-readonly jffsUsedThresholdWarning1=60
-readonly jffsUsedThresholdWarning2=65
-readonly jffsUsedThresholdRedAlert1=70
-readonly jffsUsedThresholdRedAlert2=75
-readonly jffsUsedThresholdRedAlert3=80
+readonly jffsUsedThresholdWarning1=65
+readonly jffsUsedThresholdWarning2=70
+readonly jffsUsedThresholdRedAlert1=75
+readonly jffsUsedThresholdRedAlert2=80
+readonly jffsUsedThresholdRedAlert3=85
 
 #-----------------------------------------------------------------------#
 # "tmpfs" Filesystem Percent Usage Thresholds
@@ -526,7 +526,7 @@ _CreateEMailContent_()
    local prevTimeStampSec  prevTimeStampTag  prevTimeStampStr
    local nextTimeStampSec  nextTimeStampTag  nextTimeStampStr
    local curTimeDiffSecs  minTimeDiffSecs
-   local doConfigUpdate  timeStampID  theOptionID  retCode
+   local doConfigUpdate  timeStampID  theOptionTimeID  retCode
 
    rm -f "$tmpEMailBodyFile"
 
@@ -664,6 +664,28 @@ _CreateEMailContent_()
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
+       JFFS_NOT_MOUNTED)
+           timeStampID=jffs
+           minTimeDiffSecs="$((onehrSecs * 6))"
+           nextTimeStampTag=RED4
+           emailSubject="Router JFFS NOT Mounted"
+           emailBodyTitle="JFFS is *NOT* Mounted"
+           {
+             printf "<b>**ALERT**</b>\n"
+             printf "Router JFFS partition is <b>NOT</b> found mounted.\n"
+           } > "$tmpEMailBodyFile"
+           ;;
+       JFFS_READ_ONLY)
+           timeStampID=jffs
+           minTimeDiffSecs="$((onehrSecs * 6))"
+           nextTimeStampTag=RED5
+           emailSubject="Router JFFS is READ-ONLY"
+           emailBodyTitle="JFFS is READ-ONLY"
+           {
+             printf "<b>**ALERT**</b>\n"
+             printf "Router JFFS partition is mounted <b>READ-ONLY</b>.\n"
+           } > "$tmpEMailBodyFile"
+           ;;
        TMPFS_USED_TestOnly)
            timeStampID=tmpfs
            minTimeDiffSecs=0
@@ -753,9 +775,9 @@ _CreateEMailContent_()
    doConfigUpdate=false
    nextTimeStampSec="$(date +%s)"
    nextTimeStampStr="${nextTimeStampSec}_$nextTimeStampTag"
-   theOptionID="${timeStampID}LastEmailNotificationTime"
+   theOptionTimeID="${timeStampID}LastEmailNotificationTime"
 
-   prevTimeStampStr="$(_GetConfigurationOption_ "$theOptionID")"
+   prevTimeStampStr="$(_GetConfigurationOption_ "$theOptionTimeID")"
    prevTimeStampSec="$(echo "$prevTimeStampStr" | awk -F '_' '{print $1}')"
    prevTimeStampTag="$(echo "$prevTimeStampStr" | awk -F '_' '{print $2}')"
 
@@ -768,7 +790,7 @@ _CreateEMailContent_()
        retCode=0
        doConfigUpdate=true
    #
-   elif echo "$nextTimeStampTag" | grep -qE "^(YLW[1-3]|RED[1-3])$"
+   elif echo "$nextTimeStampTag" | grep -qE "^(YLW[1-3]|RED[1-5])$"
    then
        curTimeDiffSecs="$((nextTimeStampSec - prevTimeStampSec))"
        if [ "$curTimeDiffSecs" -gt "$minTimeDiffSecs" ]
@@ -779,7 +801,7 @@ _CreateEMailContent_()
    fi
 
    "$doConfigUpdate" && \
-   _SetConfigurationOption_ "$theOptionID" "$nextTimeStampStr"
+   _SetConfigurationOption_ "$theOptionTimeID" "$nextTimeStampStr"
 
    return "$retCode"
 }
@@ -877,6 +899,20 @@ _JFFS_ShowUsageNotification_()
    local logMsg  theUsageThreshold
 
    case "$1" in
+       JFFS_NOT_MOUNTED)
+           {
+             printf "\n**ALERT**\n"
+             printf "JFFS partition is NOT found mounted.\n"
+           } >> "$tempLogFPath"
+           return 0
+           ;;
+       JFFS_READ_ONLY)
+           {
+             printf "\n**ALERT**\n"
+             printf "JFFS partition is mounted READ-ONLY.\n"
+           } >> "$tempLogFPath"
+           return 0
+           ;;
        JFFS_USED_TestOnly)
            theUsageThreshold="$jffsUsedThresholdTestOnly"
            logMsg="This notification is for **TESTING** purposes ONLY."
@@ -911,56 +947,78 @@ _JFFS_ShowUsageNotification_()
      printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
      printf "\n%s\n" "$3"
    } >> "$tempLogFPath"
+   return 0
 }
 
 #-----------------------------------------------------------------------#
 _CheckUsageThresholds_JFFS_()
 {
-   local jffsInfo  percentNum=0  doConfigUpdate
+   local jffsMountStr  jffsUsage  percentNum=0  doConfigUpdate
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
+   local returnAfterChecking=false
 
-   jffsInfo="$(df -hT /jffs | grep -E '^/dev/.* [[:blank:]]+jffs.*[[:blank:]]+/jffs$')"
-   [ -n "$jffsInfo" ] && \
-   percentNum="$(echo "$jffsInfo" | awk -F ' ' '{print $6}')"
+   jffsMountStr="$(mount | grep '/jffs')"
+   jffsUsage="$(df -hT /jffs | grep -E '.*[[:blank:]]+jffs.*[[:blank:]]+/jffs$')"
+
+   if [ -z "$jffsMountStr" ] || [ -z "$jffsUsage" ]
+   then
+       _JFFS_ShowUsageNotification_ JFFS_NOT_MOUNTED UNKNOWN UNKNOWN
+       _JFFS_MailUsageNotification_ JFFS_NOT_MOUNTED UNKNOWN UNKNOWN
+       return 0
+   fi
+
+   if echo "$jffsMountStr" | grep -qE "[[:blank:]]+[(]?ro[[:blank:],]"
+   then
+       _JFFS_ShowUsageNotification_ JFFS_READ_ONLY UNKNOWN UNKNOWN
+       _JFFS_MailUsageNotification_ JFFS_READ_ONLY UNKNOWN UNKNOWN
+       returnAfterChecking=true
+   fi
+
+   [ -n "$jffsUsage" ] && \
+   percentNum="$(echo "$jffsUsage" | awk -F ' ' '{print $6}')"
    percentNum="$(echo "$percentNum" | awk -F '%' '{print $1}')"
+
+   [ "$percentNum" -eq 0 ] && return 1
 
    if "$jffsUsageThresholdTestOnly" && \
       [ "$percentNum" -gt "$jffsUsedThresholdTestOnly" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsInfo"
-       _JFFS_MailUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsUsage"
+       _JFFS_MailUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert3" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsInfo"
-       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsUsage"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert2" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsInfo"
-       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsUsage"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert1" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsInfo"
-       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsUsage"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdWarning2" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsInfo"
-       _JFFS_MailUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsUsage"
+       _JFFS_MailUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdWarning1" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsInfo"
-       _JFFS_MailUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsInfo"
+       _JFFS_ShowUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsUsage"
+       _JFFS_MailUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsUsage"
        return 0
    fi
+
+   "$returnAfterChecking" && return 0
 
    doConfigUpdate=false
    prevTimeStampStr="$(_GetConfigurationOption_ jffsLastEmailNotificationTime)"
@@ -972,6 +1030,7 @@ _CheckUsageThresholds_JFFS_()
 
    "$doConfigUpdate" && \
    _SetConfigurationOption_ jffsLastEmailNotificationTime "${percentNum}_GRN"
+   return 0
 }
 
 #-----------------------------------------------------------------------#
@@ -1034,49 +1093,51 @@ _TMPFS_ShowUsageNotification_()
 #-----------------------------------------------------------------------#
 _CheckUsageThresholds_TMPFS_()
 {
-   local tmpfsInfo  percentNum=0  doConfigUpdate
+   local tmpfsUsage  percentNum=0  doConfigUpdate
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
 
-   tmpfsInfo="$(df -hT | grep -E '^tmpfs[[:blank:]]+tmpfs .*[[:blank:]]+/tmp$')"
-   [ -n "$tmpfsInfo" ] && \
-   percentNum="$(echo "$tmpfsInfo" | awk -F ' ' '{print $6}')"
+   tmpfsUsage="$(df -hT | grep -E '^tmpfs[[:blank:]]+tmpfs .*[[:blank:]]+/tmp$')"
+   [ -n "$tmpfsUsage" ] && \
+   percentNum="$(echo "$tmpfsUsage" | awk -F ' ' '{print $6}')"
    percentNum="$(echo "$percentNum" | awk -F '%' '{print $1}')"
+
+   [ "$percentNum" -eq 0 ] && return 1
 
    if "$tmpfsUsageThresholdTestOnly" && \
       [ "$percentNum" -gt "$tmpfsUsedThresholdTestOnly" ]
    then
-       _TMPFS_ShowUsageNotification_ TMPFS_USED_TestOnly "$percentNum" "$tmpfsInfo"
-       _TMPFS_MailUsageNotification_ TMPFS_USED_TestOnly "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_TestOnly "$percentNum" "$tmpfsUsage"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_TestOnly "$percentNum" "$tmpfsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdRedAlert3" ]
    then
-       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert3 "$percentNum" "$tmpfsInfo"
-       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert3 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert3 "$percentNum" "$tmpfsUsage"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert3 "$percentNum" "$tmpfsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdRedAlert2" ]
    then
-       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert2 "$percentNum" "$tmpfsInfo"
-       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert2 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert2 "$percentNum" "$tmpfsUsage"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert2 "$percentNum" "$tmpfsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdRedAlert1" ]
    then
-       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert1 "$percentNum" "$tmpfsInfo"
-       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert1 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_RedAlert1 "$percentNum" "$tmpfsUsage"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_RedAlert1 "$percentNum" "$tmpfsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdWarning2" ]
    then
-       _TMPFS_ShowUsageNotification_ TMPFS_USED_Warning2 "$percentNum" "$tmpfsInfo"
-       _TMPFS_MailUsageNotification_ TMPFS_USED_Warning2 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_Warning2 "$percentNum" "$tmpfsUsage"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_Warning2 "$percentNum" "$tmpfsUsage"
        return 0
    fi
    if [ "$percentNum" -gt "$tmpfsUsedThresholdWarning1" ]
    then
-       _TMPFS_ShowUsageNotification_ TMPFS_USED_Warning1 "$percentNum" "$tmpfsInfo"
-       _TMPFS_MailUsageNotification_ TMPFS_USED_Warning1 "$percentNum" "$tmpfsInfo"
+       _TMPFS_ShowUsageNotification_ TMPFS_USED_Warning1 "$percentNum" "$tmpfsUsage"
+       _TMPFS_MailUsageNotification_ TMPFS_USED_Warning1 "$percentNum" "$tmpfsUsage"
        return 0
    fi
 
