@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-May-28 [Martinski W.]
+# Last Modified: 2024-May-31 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.0"
+readonly LMS_VERSION="0.7.1"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -301,8 +301,11 @@ _ValidateConfigurationFile_()
 {
    [ ! -f "$logMemStatsCFGfile" ] && return 1
 
+   local dateTimeStr
+
    if ! grep -qE "^## [0-9]+[-].* ##$" "$logMemStatsCFGfile"
    then
+       dateTimeStr="## $(date +'%Y-%b-%d, %I:%M:%S %p %Z') ##"
        sed -i "1 i $dateTimeStr" "$logMemStatsCFGfile"
    fi
    if ! grep -q "^maxLogFileSizeKB=" "$logMemStatsCFGfile"
