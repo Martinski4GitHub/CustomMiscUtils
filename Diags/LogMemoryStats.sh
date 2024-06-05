@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-May-31 [Martinski W.]
+# Last Modified: 2024-Jun-04 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.1"
+readonly LMS_VERSION="0.7.2"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -164,7 +164,7 @@ _CheckForScriptUpdates_()
    "$isVerboseMode" && \
    _PrintMsg_ "\nChecking for script updates..."
 
-   curl -kLSs --retry 4 --retry-delay 5 --retry-connrefused \
+   curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${LMS_SCRIPT_URL}/$LMS_VERFILE" -o "$theVersTextFile"
 
    if [ ! -s "$theVersTextFile" ] || grep -iq "404: Not Found" "$theVersTextFile"
@@ -251,7 +251,7 @@ _DownloadLibraryFile_CEM_()
    _PrintMsg_ "\n${msgStr} the shared library script file to support email notifications...\n"
 
    mkdir -m 755 -p "$CUSTOM_EMAIL_LIBDir"
-   curl -kLSs --retry 3 --retry-delay 5 --retry-connrefused \
+   curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${CEM_LIB_URL}/$CUSTOM_EMAIL_LIBName" -o "$CUSTOM_EMAIL_LIBFile"
    curlCode="$?"
 
