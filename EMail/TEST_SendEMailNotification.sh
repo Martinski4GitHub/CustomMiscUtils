@@ -11,11 +11,11 @@
 # the variable names.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Apr-13 [Martinski W.]
+# Last Modified: 2024-Jun-04 [Martinski W.]
 ####################################################################
 set -u
 
-TEST_VERSION="0.5.11"
+TEST_VERSION="0.5.12"
 
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
@@ -39,7 +39,7 @@ _DownloadCEMLibraryFile_()
    printf "\n${msgStr} the shared library script file to support email notifications...\n"
 
    mkdir -m 755 -p "$CUSTOM_EMAIL_LIBDir"
-   curl -kLSs --retry 3 --retry-delay 5 --retry-connrefused \
+   curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${CEM_LIB_URL}/$CUSTOM_EMAIL_LIBName" -o "$CUSTOM_EMAIL_LIBFile"
    curlCode="$?"
 
