@@ -7,7 +7,7 @@
 # email notifications using AMTM email configuration file.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Mar-28 [Martinski W.]
+# Last Modified: 2024-Jun-04 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -15,7 +15,7 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="0.9.18"
+CEM_LIB_VERSION="0.9.19"
 CEM_TXT_VERFILE="cemVersion.txt"
 
 CEM_LIB_SCRIPT_TAG="master"
@@ -129,7 +129,7 @@ _CheckLibraryUpdates_CEM_()
    "$cemIsVerboseMode" && "$showMsg" && \
    _PrintMsg_CEM_ "\nChecking for shared library script updates..."
 
-   curl -kLSs --retry 3 --retry-delay 5 --retry-connrefused \
+   curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${CEM_LIB_SCRIPT_URL}/$CEM_TXT_VERFILE" -o "$theVersTextFile"
 
    if [ ! -s "$theVersTextFile" ] || grep -iq "404: Not Found" "$theVersTextFile"
@@ -340,7 +340,7 @@ _SendEMailNotification_CEM_()
 
    date +"$cemDateTimeFormat" > "$cemTempEMailLogFile"
 
-   /usr/sbin/curl -v --url "${PROTOCOL}://${SMTP}:${PORT}" \
+   /usr/sbin/curl -v --retry 4 --retry-delay 5 --url "${PROTOCOL}://${SMTP}:${PORT}" \
    --mail-from "$FROM_ADDRESS" --mail-rcpt "$TO_ADDRESS" $CC_ADDRESS_ARG \
    --user "${USERNAME}:$(/usr/sbin/openssl aes-256-cbc "$emailPwEnc" -d -in "$amtmEMailPswdFile" -pass pass:ditbabot,isoi)" \
    --upload-file "$cemTempEMailContent" \
