@@ -3,7 +3,7 @@
 # Setup_YazDHCP_4TEST.sh
 # To set up the modified YazDHCP files for testing purposes.
 #
-# Last Modified: Martinski W. [2024-June-25]
+# Last Modified: Martinski W. [2024-June-28]
 ###################################################################
 set -u
 
@@ -32,7 +32,7 @@ _ShowUsage_()
 --------------------------------------------------------------------
 SYNTAX:
 
-./$theScriptFName { setup | download | restore }
+./$theScriptFName { setup | download }
 
 EXAMPLE CALLS:
 
@@ -43,9 +43,6 @@ EXAMPLE CALLS:
 ./$theScriptFName download
     Only to download new TEST files for YazDHCP.
     All original existing files are left intact.
-
-./$theScriptFName restore
-    To restore ORIGINAL YazDHCP files & remove TEST files:
 --------------------------------------------------------------------
 EOF
 }
@@ -208,7 +205,7 @@ else
    then
        if _PromptForYesOrNo_ "Set up YazDHCP for TESTING NEW version?"
        then
-           _SaveOriginalFiles_
+           ##OFF## _SaveOriginalFiles_
            _DownloadNewTestFiles_
            _SetUpFilesForTesting_
            _RestartYazDHCP_ TEST
@@ -218,7 +215,7 @@ else
        exit 0
    fi
 
-   if [ "$1" = "restore" ]
+   if false && [ "$1" = "restore" ] ##OFF##
    then
        if _PromptForYesOrNo_ "Restore Original YazDHCP files?"
        then
