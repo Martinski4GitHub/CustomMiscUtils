@@ -43,7 +43,6 @@ EXAMPLE CALLS:
 
 ./$theScriptFName setup
     To download & set up new TEST files for ${YAZDHCP_TITLE}.
-    All original existing files are saved for backup.
 
 ./$theScriptFName download
     Only to download new TEST files for ${YAZDHCP_TITLE}.
