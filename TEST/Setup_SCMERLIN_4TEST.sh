@@ -203,7 +203,7 @@ else
        if _PromptForYesOrNo_ "Set up $SCMERLIN_TITLE for TESTING NEW version?"
        then
            ##OFF## _SaveOriginalFiles_
-           _DownloadNewTestFiles_
+           _DownloadNewTestFiles_ FORCE
            _SetUpFilesForTesting_
            _RestartRouterMsg_
        else 
