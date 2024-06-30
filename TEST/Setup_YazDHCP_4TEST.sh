@@ -210,7 +210,7 @@ else
        if _PromptForYesOrNo_ "Set up $YAZDHCP_TITLE for TESTING NEW version?"
        then
            ##OFF## _SaveOriginalFiles_
-           _DownloadNewTestFiles_
+           _DownloadNewTestFiles_ FORCE
            _SetUpFilesForTesting_
            _RestartYazDHCP_ TEST
        else 
