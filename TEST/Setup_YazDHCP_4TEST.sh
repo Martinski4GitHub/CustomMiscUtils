@@ -1,15 +1,20 @@
 #!/bin/sh
 ###################################################################
-# Setup_YazDHCP_4TEST.sh
-# To set up the modified YazDHCP files for testing purposes.
+# SetUp_YazDHCP_4TEST.sh
+# To set up the modified YazDHCP files for test purposes ONLY.
 #
-# Last Modified: Martinski W. [2024-June-28]
+# IMPORTANT NOTE:
+# After running this script, the router DOES NOT need to be 
+# rebooted to start testing the WebGUI page.
+#
+# Last Modified: Martinski W. [2024-June-29]
 ###################################################################
 set -u
 
 readonly theScriptFName="${0##*/}"
 readonly ADDONS_DIR="/jffs/addons"
 readonly SCRIPTS_DIR="/jffs/scripts"
+readonly YAZDHCP_TITLE="YazDHCP"
 readonly YAZDHCP_SCRIPT="YazDHCP"
 readonly YAZDHCP_WEBGUI="Advanced_DHCP_Content.asp"
 readonly YAZDHCP_ADDONS_DIR="${ADDONS_DIR}/YazDHCP.d"
@@ -37,11 +42,11 @@ SYNTAX:
 EXAMPLE CALLS:
 
 ./$theScriptFName setup
-    To download & set up new TEST files for YazDHCP.
+    To download & set up new TEST files for ${YAZDHCP_TITLE}.
     All original existing files are saved for backup.
 
 ./$theScriptFName download
-    Only to download new TEST files for YazDHCP.
+    Only to download new TEST files for ${YAZDHCP_TITLE}.
     All original existing files are left intact.
 --------------------------------------------------------------------
 EOF
@@ -61,11 +66,11 @@ _DownloadNewTestFiles_()
 
        if [ ! -s "$TEST_YAZDHCP_SCRIPT" ]
        then
-           echo "TEST YazDHCP script file [$TEST_YAZDHCP_SCRIPT] is *NOT* FOUND."
+           echo "TEST $YAZDHCP_TITLE script file [$TEST_YAZDHCP_SCRIPT] is *NOT* FOUND."
            echo "Nothing to test. Exiting..."
            exit 1
        else
-           echo "TEST YazDHCP script file [$TEST_YAZDHCP_SCRIPT] was downloaded successfully."
+           echo "TEST $YAZDHCP_TITLE script file [$TEST_YAZDHCP_SCRIPT] was downloaded successfully."
        fi
    fi
 
@@ -76,11 +81,11 @@ _DownloadNewTestFiles_()
 
        if [ ! -s "$TEST_YAZDHCP_WEBPAGE" ]
        then
-           echo "TEST YazDHCP webpage file [$TEST_YAZDHCP_WEBPAGE] is *NOT* FOUND."
+           echo "TEST $YAZDHCP_TITLE webpage file [$TEST_YAZDHCP_WEBPAGE] is *NOT* FOUND."
            echo "Nothing to test. Exiting..."
            exit 1
        else
-           echo "TEST YazDHCP webpage file [$TEST_YAZDHCP_WEBPAGE] was downloaded successfully."
+           echo "TEST $YAZDHCP_TITLE webpage file [$TEST_YAZDHCP_WEBPAGE] was downloaded successfully."
        fi
    fi
    echo
@@ -92,14 +97,14 @@ _SaveOriginalFiles_()
    then
        cp -fp "$ORIG_YAZDHCP_SCRIPT" "$SAVE_YAZDHCP_SCRIPT"
        chmod 644 "$SAVE_YAZDHCP_SCRIPT"
-       echo "Original YazDHCP script file [$SAVE_YAZDHCP_SCRIPT] was saved."
+       echo "Original $YAZDHCP_TITLE script file [$SAVE_YAZDHCP_SCRIPT] was saved."
    fi
 
    if [ ! -s "$SAVE_YAZDHCP_WEBPAGE" ]
    then
        cp -fp "$ORIG_YAZDHCP_WEBPAGE" "$SAVE_YAZDHCP_WEBPAGE"
        chmod 644 "$SAVE_YAZDHCP_WEBPAGE"
-       echo "Original YazDHCP webpage file [$SAVE_YAZDHCP_WEBPAGE] was saved."
+       echo "Original $YAZDHCP_TITLE webpage file [$SAVE_YAZDHCP_WEBPAGE] was saved."
    fi
    echo
 }
@@ -110,9 +115,9 @@ _RestoreOriginalFiles_()
    then
        mv -f "$SAVE_YAZDHCP_SCRIPT" "$ORIG_YAZDHCP_SCRIPT"
        chmod 755 "$ORIG_YAZDHCP_SCRIPT"
-       echo "Original YazDHCP script file [$ORIG_YAZDHCP_SCRIPT] was restored."
+       echo "Original $YAZDHCP_TITLE script file [$ORIG_YAZDHCP_SCRIPT] was restored."
    else
-       echo "No saved YazDHCP script file [$SAVE_YAZDHCP_SCRIPT] was found to restore."
+       echo "No saved $YAZDHCP_TITLE script file [$SAVE_YAZDHCP_SCRIPT] was found to restore."
    fi
    rm -f "$TEST_YAZDHCP_SCRIPT"
 
@@ -120,9 +125,9 @@ _RestoreOriginalFiles_()
    then
        mv -f "$SAVE_YAZDHCP_WEBPAGE" "$ORIG_YAZDHCP_WEBPAGE"
        chmod 644 "$ORIG_YAZDHCP_WEBPAGE"
-       echo "Original YazDHCP webpage file [$ORIG_YAZDHCP_WEBPAGE] was restored."
+       echo "Original $YAZDHCP_TITLE webpage file [$ORIG_YAZDHCP_WEBPAGE] was restored."
    else
-       echo "No saved YazDHCP webpage file [$SAVE_YAZDHCP_WEBPAGE] was found to restore."
+       echo "No saved $YAZDHCP_TITLE webpage file [$SAVE_YAZDHCP_WEBPAGE] was found to restore."
    fi
    rm -f "$TEST_YAZDHCP_WEBPAGE"
    echo
@@ -136,7 +141,7 @@ _SetUpFilesForTesting_()
    else
        cp -fp "$TEST_YAZDHCP_SCRIPT" "$ORIG_YAZDHCP_SCRIPT"
        chmod 755 "$ORIG_YAZDHCP_SCRIPT"
-       echo "TEST YazDHCP script file [$TEST_YAZDHCP_SCRIPT] is ready."
+       echo "TEST $YAZDHCP_TITLE script file [$TEST_YAZDHCP_SCRIPT] is ready."
    fi
    
    if diff -q "$ORIG_YAZDHCP_WEBPAGE" "$TEST_YAZDHCP_WEBPAGE"
@@ -145,7 +150,7 @@ _SetUpFilesForTesting_()
    else
        cp -fp "$TEST_YAZDHCP_WEBPAGE" "$ORIG_YAZDHCP_WEBPAGE"
        chmod 644 "$ORIG_YAZDHCP_WEBPAGE" 
-       echo "TEST YazDHCP webpage file [$TEST_YAZDHCP_WEBPAGE] is ready."
+       echo "TEST $YAZDHCP_TITLE webpage file [$TEST_YAZDHCP_WEBPAGE] is ready."
    fi
    echo
 }
@@ -154,14 +159,14 @@ _RestartYazDHCP_()
 {
    if [ $# -eq 1 ] && [ "$1" = "ORIG" ]
    then
-       echo "Restarting YazDHCP with original files..."
+       echo "Restarting $YAZDHCP_TITLE with original files..."
    else
-       echo "Restarting YazDHCP for testing purposes..."
+       echo "Restarting $YAZDHCP_TITLE for testing purposes..."
    fi
    $ORIG_YAZDHCP_SCRIPT startup &
    echo "Please wait ~5 seconds for process to be completed..."
    sleep 5
-   echo "Completed. You can now start testing YazDHCP."
+   echo "Completed. You can now start testing $YAZDHCP_TITLE."
    echo
 }
 
@@ -177,14 +182,14 @@ _PromptForYesOrNo_()
 
 if [ ! -s "$ORIG_YAZDHCP_SCRIPT" ]
 then
-   echo "The YazDHCP script file [$ORIG_YAZDHCP_SCRIPT] is *NOT* FOUND."
+   echo "The $YAZDHCP_TITLE script file [$ORIG_YAZDHCP_SCRIPT] is *NOT* FOUND."
    echo "Exiting..."
    exit 1
 fi
 
 if [ ! -s "$ORIG_YAZDHCP_WEBPAGE" ]
 then
-   echo "The YazDHCP webpage file [$ORIG_YAZDHCP_WEBPAGE] is *NOT* FOUND."
+   echo "The $YAZDHCP_TITLE webpage file [$ORIG_YAZDHCP_WEBPAGE] is *NOT* FOUND."
    echo "Exiting..."
    exit 1
 fi
@@ -203,7 +208,7 @@ else
 
    if [ "$1" = "setup" ]
    then
-       if _PromptForYesOrNo_ "Set up YazDHCP for TESTING NEW version?"
+       if _PromptForYesOrNo_ "Set up $YAZDHCP_TITLE for TESTING NEW version?"
        then
            ##OFF## _SaveOriginalFiles_
            _DownloadNewTestFiles_
@@ -217,7 +222,7 @@ else
 
    if false && [ "$1" = "restore" ] ##OFF##
    then
-       if _PromptForYesOrNo_ "Restore Original YazDHCP files?"
+       if _PromptForYesOrNo_ "Restore Original $YAZDHCP_TITLE files?"
        then
            _RestoreOriginalFiles_
            _RestartYazDHCP_ ORIG
@@ -229,7 +234,7 @@ else
 
    if [ "$1" = "download" ]
    then
-       if _PromptForYesOrNo_ "Download new TEST versions of YazDHCP files?"
+       if _PromptForYesOrNo_ "Download new TEST versions of $YAZDHCP_TITLE files?"
        then _DownloadNewTestFiles_ FORCE
        else echo "Exiting..."
        fi
