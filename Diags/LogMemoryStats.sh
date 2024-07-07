@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Jun-04 [Martinski W.]
+# Last Modified: 2024-Jul-07 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.2"
+readonly LMS_VERSION="0.7.3"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -162,13 +162,15 @@ _CheckForScriptUpdates_()
    then isVerboseMode=false ; else isVerboseMode=true ; fi
 
    "$isVerboseMode" && \
-   _PrintMsg_ "\nChecking for script updates..."
+   _PrintMsg_ "\nChecking for script updates...\n"
 
    curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${LMS_SCRIPT_URL}/$LMS_VERFILE" -o "$theVersTextFile"
 
-   if [ ! -s "$theVersTextFile" ] || grep -iq "404: Not Found" "$theVersTextFile"
+   if [ ! -s "$theVersTextFile" ] || \
+      grep -Eiq "^404: Not Found" "$theVersTextFile"
    then
+       [ -s "$theVersTextFile" ] && cat "$theVersTextFile"
        rm -f "$theVersTextFile"
        _PrintMsg_ "\n**ERROR**: Could not download the version file [$LMS_VERFILE]\n"
        return 1
@@ -253,17 +255,19 @@ _DownloadLibraryFile_CEM_()
    mkdir -m 755 -p "$CUSTOM_EMAIL_LIBDir"
    curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${CEM_LIB_URL}/$CUSTOM_EMAIL_LIBName" -o "$CUSTOM_EMAIL_LIBFile"
-   curlCode="$?"
 
-   if [ "$curlCode" -eq 0 ] && [ -s "$CUSTOM_EMAIL_LIBFile" ]
+   if [ ! -s "$CUSTOM_EMAIL_LIBFile" ] || \
+      grep -Eiq "^404: Not Found" "$CUSTOM_EMAIL_LIBFile"
    then
+       retCode=1
+       [ -s "$CUSTOM_EMAIL_LIBFile" ] && cat "$CUSTOM_EMAIL_LIBFile"
+       rm -f "$CUSTOM_EMAIL_LIBFile"
+       _PrintMsg_ "\n**ERROR**: Unable to download the shared library script file [$CUSTOM_EMAIL_LIBName].\n"
+   else
        retCode=0
        chmod 755 "$CUSTOM_EMAIL_LIBFile"
        . "$CUSTOM_EMAIL_LIBFile"
        _PrintMsg_ "\nDone.\n"
-   else
-       retCode=1
-       _PrintMsg_ "\n**ERROR**: Unable to download the shared library script file [$CUSTOM_EMAIL_LIBName].\n"
    fi
    return "$retCode"
 }
