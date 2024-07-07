@@ -7,7 +7,7 @@
 # email notifications using AMTM email configuration file.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Jun-04 [Martinski W.]
+# Last Modified: 2024-Jul-07 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -15,7 +15,7 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="0.9.19"
+CEM_LIB_VERSION="0.9.20"
 CEM_TXT_VERFILE="cemVersion.txt"
 
 CEM_LIB_SCRIPT_TAG="master"
@@ -127,13 +127,15 @@ _CheckLibraryUpdates_CEM_()
    then showMsg=false ; else showMsg=true ; fi
 
    "$cemIsVerboseMode" && "$showMsg" && \
-   _PrintMsg_CEM_ "\nChecking for shared library script updates..."
+   _PrintMsg_CEM_ "\nChecking for shared library script updates...\n"
 
    curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${CEM_LIB_SCRIPT_URL}/$CEM_TXT_VERFILE" -o "$theVersTextFile"
 
-   if [ ! -s "$theVersTextFile" ] || grep -iq "404: Not Found" "$theVersTextFile"
+   if [ ! -s "$theVersTextFile" ] || \
+      grep -Eiq "^404: Not Found" "$theVersTextFile"
    then
+       [ -s "$theVersTextFile" ] && cat "$theVersTextFile"
        rm -f "$theVersTextFile"
        _PrintMsg_CEM_ "\n**ERROR**: Could not download the version file [$CEM_TXT_VERFILE]\n"
        return 1
