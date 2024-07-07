@@ -11,11 +11,11 @@
 # the variable names.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Jun-04 [Martinski W.]
+# Last Modified: 2024-Jul-07 [Martinski W.]
 ####################################################################
 set -u
 
-TEST_VERSION="0.5.12"
+TEST_VERSION="0.5.13"
 
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
@@ -41,17 +41,19 @@ _DownloadCEMLibraryFile_()
    mkdir -m 755 -p "$CUSTOM_EMAIL_LIBDir"
    curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${CEM_LIB_URL}/$CUSTOM_EMAIL_LIBName" -o "$CUSTOM_EMAIL_LIBFile"
-   curlCode="$?"
 
-   if [ "$curlCode" -eq 0 ] && [ -s "$CUSTOM_EMAIL_LIBFile" ]
+   if [ ! -s "$CUSTOM_EMAIL_LIBFile" ] || \
+      grep -Eiq "^404: Not Found" "$CUSTOM_EMAIL_LIBFile"
    then
+       retCode=1
+       [ -s "$CUSTOM_EMAIL_LIBFile" ] && cat "$CUSTOM_EMAIL_LIBFile"
+       rm -f "$CUSTOM_EMAIL_LIBFile"
+       printf "\n**ERROR**: Unable to download the shared library script file [$CUSTOM_EMAIL_LIBName].\n"
+   else
        retCode=0
        chmod 755 "$CUSTOM_EMAIL_LIBFile"
        . "$CUSTOM_EMAIL_LIBFile"
        printf "\nDone.\n"
-   else
-       retCode=1
-       printf "\n**ERROR**: Unable to download the shared library script file [$CUSTOM_EMAIL_LIBName].\n"
    fi
    return "$retCode"
 }
