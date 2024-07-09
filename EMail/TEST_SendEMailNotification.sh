@@ -46,7 +46,7 @@ _DownloadCEMLibraryHelperFile_()
    else
        chmod 755 "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
        . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
-       printf "\nThe email library helper script [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] was downloaded.\n"
+       printf "The email library helper script [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] was downloaded.\n"
        return 0
    fi
 }
