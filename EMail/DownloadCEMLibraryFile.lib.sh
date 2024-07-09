@@ -13,7 +13,7 @@
 # but do *NOT* change the variable names.
 #
 # Creation Date: 2024-Jul-08 [Martinski W.]
-# Last Modified: 2024-Jul-08 [Martinski W.]
+# Last Modified: 2024-Jul-09 [Martinski W.]
 ####################################################################
 
 if [ -z "${_LIB_DownloadCEMLibraryFile_SHELL_:+xSETx}" ]
@@ -65,7 +65,8 @@ _DownloadLibraryScript_CEM_()
       else
           chmod 755 "$CEM_LIB_LOCAL_PATH"
           . "$CEM_LIB_LOCAL_PATH"
-          _Print_CEMdl_ "\nThe email library script file [$CEM_LIB_FILE_NAME] was ${msgStr2}.\n"
+          [ "$2" -gt 1 ] && echo
+          _Print_CEMdl_ "The email library script file [$CEM_LIB_FILE_NAME] was ${msgStr2}.\n"
           return 0
       fi
    }
