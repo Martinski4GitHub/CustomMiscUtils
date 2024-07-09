@@ -31,9 +31,12 @@ CEM_LIB_LOCAL_DIR="/jffs/addons/shared-libs"
 CEM_LIB_FILE_NAME="CustomEMailFunctions.lib.sh"
 CEM_LIB_LOCAL_PATH="${CEM_LIB_LOCAL_DIR}/$CEM_LIB_FILE_NAME"
 
+cemdlIsVerboseMode=true
 cemdlIsInteractive=false
+
 if [ -t 0 ] && ! tty | grep -qwi "not"
 then cemdlIsInteractive=true ; fi
+if ! "$cemdlIsInteractive" ; then cemdlIsVerboseMode=false ; fi
 
 _Print_CEMdl_()
 { "$cemdlIsInteractive" && printf "${1}" ; }
@@ -66,7 +69,10 @@ _DownloadLibraryScript_CEM_()
           chmod 755 "$CEM_LIB_LOCAL_PATH"
           . "$CEM_LIB_LOCAL_PATH"
           [ "$2" -gt 1 ] && echo
-          _Print_CEMdl_ "The email library script file [$CEM_LIB_FILE_NAME] was ${msgStr2}.\n"
+          if [ "$2" -gt 1 ] || "$cemdlIsVerboseMode"
+          then
+              _Print_CEMdl_ "The email library script file [$CEM_LIB_FILE_NAME] was ${msgStr2}.\n"
+          fi
           return 0
       fi
    }
@@ -85,6 +91,7 @@ _DownloadLibraryScript_CEM_()
        return 0
    fi
 
+   "$cemdlIsVerboseMode" && \
    _Print_CEMdl_ "\n${msgStr1} the shared library script file to support email notifications...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
@@ -97,10 +104,16 @@ _DownloadLibraryScript_CEM_()
    return "$retCode"
 }
 
+#-----------------------------------------------------------#
 _CheckForLibraryScript_CEM_()
 {
    local cemDownloadLibScriptMsge=""
    local cemDownloadLibScriptFlag=false
+
+   if [ $# -gt 0 ] && [ "$1" = "-quiet" ]
+   then cemdlIsVerboseMode=false
+   else cemdlIsVerboseMode=true
+   fi
 
    if [ -f "$CEM_LIB_LOCAL_PATH" ]
    then
