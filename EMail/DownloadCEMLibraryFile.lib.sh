@@ -29,7 +29,7 @@ CEM_LIB_URL2="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils
 
 CEM_LIB_LOCAL_DIR="/jffs/addons/shared-libs"
 CEM_LIB_FILE_NAME="CustomEMailFunctions.lib.sh"
-CEM_LIB_LOCAL_PATH="${CEM_LIB_LOCAL_DIR}/$CEM_LIB_FILE_NAME"
+CEM_LIB_FILE_PATH="${CEM_LIB_LOCAL_DIR}/$CEM_LIB_FILE_NAME"
 
 cemdlIsVerboseMode=true
 cemdlIsInteractive=false
@@ -55,19 +55,19 @@ _DownloadLibraryScript_CEM_()
       if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] ; then return 1 ; fi
 
       curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
-           "${1}/$CEM_LIB_FILE_NAME" -o "$CEM_LIB_LOCAL_PATH"
+           "${1}/$CEM_LIB_FILE_NAME" -o "$CEM_LIB_FILE_PATH"
 
-      if [ ! -s "$CEM_LIB_LOCAL_PATH" ] || \
-         grep -Eiq "^404: Not Found" "$CEM_LIB_LOCAL_PATH"
+      if [ ! -s "$CEM_LIB_FILE_PATH" ] || \
+         grep -Eiq "^404: Not Found" "$CEM_LIB_FILE_PATH"
       then
-          [ -s "$CEM_LIB_LOCAL_PATH" ] && { echo ; cat "$CEM_LIB_LOCAL_PATH" ; }
-          rm -f "$CEM_LIB_LOCAL_PATH"
+          [ -s "$CEM_LIB_FILE_PATH" ] && { echo ; cat "$CEM_LIB_FILE_PATH" ; }
+          rm -f "$CEM_LIB_FILE_PATH"
           _Print_CEMdl_ "\n**ERROR**: Unable to download the library script [$CEM_LIB_FILE_NAME]\n"
           [ "$2" -lt "$urlDLMax" ] && _Print_CEMdl_ "Trying again with a different URL...\n"
           return 1
       else
-          chmod 755 "$CEM_LIB_LOCAL_PATH"
-          . "$CEM_LIB_LOCAL_PATH"
+          chmod 755 "$CEM_LIB_FILE_PATH"
+          . "$CEM_LIB_FILE_PATH"
           [ "$2" -gt 1 ] && echo
           if [ "$2" -gt 1 ] || "$cemdlIsVerboseMode"
           then
@@ -115,9 +115,9 @@ _CheckForLibraryScript_CEM_()
    else cemdlIsVerboseMode=true
    fi
 
-   if [ -f "$CEM_LIB_LOCAL_PATH" ]
+   if [ -f "$CEM_LIB_FILE_PATH" ]
    then
-       . "$CEM_LIB_LOCAL_PATH"
+       . "$CEM_LIB_FILE_PATH"
 
        if [ -z "${CEM_LIB_VERSION:+xSETx}" ] || \
            _CheckLibraryUpdates_CEM_ "$CEM_LIB_LOCAL_DIR" "$@"
