@@ -13,7 +13,7 @@
 # but do *NOT* change the variable names.
 #
 # Creation Date: 2024-Jul-08 [Martinski W.]
-# Last Modified: 2024-Jul-09 [Martinski W.]
+# Last Modified: 2024-Jul-10 [Martinski W.]
 ####################################################################
 
 if [ -z "${_LIB_DownloadCEMLibraryFile_SHELL_:+xSETx}" ]
@@ -21,7 +21,7 @@ then _LIB_DownloadCEMLibraryFile_SHELL_=0
 else return 0
 fi
 
-CEM_DL_HELPER_VERSION="0.1.5"
+CEM_DL_HELPER_VERSION="0.1.6"
 
 CEM_LIB_BRANCH="master"
 CEM_LIB_URL1="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/${CEM_LIB_BRANCH}/EMail"
@@ -85,7 +85,7 @@ _DownloadLibraryScript_CEM_()
    if [ ! -d "$1" ]
    then
        _Print_CEMdl_ "\n**ERROR**: Directory Path [$1] *NOT* FOUND.\n"
-       return 0
+       return 1
    fi
 
    "$doDL_IsVerboseMode" && \
@@ -104,6 +104,7 @@ _DownloadLibraryScript_CEM_()
 #-----------------------------------------------------------#
 _CheckForLibraryScript_CEM_()
 {
+   local retCode=0
    local doDL_LibScriptMsge=""
    local doDL_LibScriptFlag=false
    local doDL_IsVerboseMode=true
@@ -120,16 +121,23 @@ _CheckForLibraryScript_CEM_()
        if [ -z "${CEM_LIB_VERSION:+xSETx}" ] || \
            _CheckLibraryUpdates_CEM_ "$CEM_LIB_LOCAL_DIR" "$1"
        then
+           retCode=1
            doDL_LibScriptFlag=true
            doDL_LibScriptMsge=update
        fi
    else
+       retCode=1
        doDL_LibScriptFlag=true
        doDL_LibScriptMsge=install
    fi
 
-   "$doDL_LibScriptFlag" && \
-   _DownloadLibraryScript_CEM_ "$CEM_LIB_LOCAL_DIR" "$doDL_LibScriptMsge"
+   if "$doDL_LibScriptFlag"
+   then
+       _DownloadLibraryScript_CEM_ "$CEM_LIB_LOCAL_DIR" "$doDL_LibScriptMsge"
+       retCode="$?"
+   fi
+
+   return "$retCode"
 }
 
 _LIB_DownloadCEMLibraryFile_SHELL_=1
