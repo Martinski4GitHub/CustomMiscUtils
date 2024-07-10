@@ -31,12 +31,9 @@ CEM_LIB_LOCAL_DIR="/jffs/addons/shared-libs"
 CEM_LIB_FILE_NAME="CustomEMailFunctions.lib.sh"
 CEM_LIB_FILE_PATH="${CEM_LIB_LOCAL_DIR}/$CEM_LIB_FILE_NAME"
 
-cemdlIsVerboseMode=true
 cemdlIsInteractive=false
-
 if [ -t 0 ] && ! tty | grep -qwi "not"
 then cemdlIsInteractive=true ; fi
-if ! "$cemdlIsInteractive" ; then cemdlIsVerboseMode=false ; fi
 
 _Print_CEMdl_()
 { "$cemdlIsInteractive" && printf "${1}" ; }
@@ -69,7 +66,7 @@ _DownloadLibraryScript_CEM_()
           chmod 755 "$CEM_LIB_FILE_PATH"
           . "$CEM_LIB_FILE_PATH"
           [ "$2" -gt 1 ] && echo
-          if [ "$2" -gt 1 ] || "$cemdlIsVerboseMode"
+          if [ "$2" -gt 1 ] || "$doDL_IsVerboseMode"
           then
               _Print_CEMdl_ "The email library script file [$CEM_LIB_FILE_NAME] was ${msgStr2}.\n"
           fi
@@ -91,7 +88,7 @@ _DownloadLibraryScript_CEM_()
        return 0
    fi
 
-   "$cemdlIsVerboseMode" && \
+   "$doDL_IsVerboseMode" && \
    _Print_CEMdl_ "\n${msgStr1} the shared library script file to support email notifications...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
@@ -107,12 +104,13 @@ _DownloadLibraryScript_CEM_()
 #-----------------------------------------------------------#
 _CheckForLibraryScript_CEM_()
 {
-   local cemDownloadLibScriptMsge=""
-   local cemDownloadLibScriptFlag=false
+   local doDL_LibScriptMsge=""
+   local doDL_LibScriptFlag=false
+   local doDL_IsVerboseMode=true
 
    if [ $# -gt 0 ] && [ "$1" = "-quiet" ]
-   then cemdlIsVerboseMode=false
-   else cemdlIsVerboseMode=true
+   then doDL_IsVerboseMode=false
+   else doDL_IsVerboseMode=true
    fi
 
    if [ -f "$CEM_LIB_FILE_PATH" ]
@@ -120,18 +118,18 @@ _CheckForLibraryScript_CEM_()
        . "$CEM_LIB_FILE_PATH"
 
        if [ -z "${CEM_LIB_VERSION:+xSETx}" ] || \
-           _CheckLibraryUpdates_CEM_ "$CEM_LIB_LOCAL_DIR" "$@"
+           _CheckLibraryUpdates_CEM_ "$CEM_LIB_LOCAL_DIR" "$1"
        then
-           cemDownloadLibScriptFlag=true
-           cemDownloadLibScriptMsge=update
+           doDL_LibScriptFlag=true
+           doDL_LibScriptMsge=update
        fi
    else
-       cemDownloadLibScriptFlag=true
-       cemDownloadLibScriptMsge=install
+       doDL_LibScriptFlag=true
+       doDL_LibScriptMsge=install
    fi
 
-   "$cemDownloadLibScriptFlag" && \
-   _DownloadLibraryScript_CEM_ "$CEM_LIB_LOCAL_DIR" "$cemDownloadLibScriptMsge"
+   "$doDL_LibScriptFlag" && \
+   _DownloadLibraryScript_CEM_ "$CEM_LIB_LOCAL_DIR" "$doDL_LibScriptMsge"
 }
 
 _LIB_DownloadCEMLibraryFile_SHELL_=1
