@@ -21,7 +21,7 @@ then _LIB_DownloadCEMLibraryFile_SHELL_=0
 else return 0
 fi
 
-CEM_DL_HELPER_VERSION="0.1.6"
+CEM_DL_HELPER_VERSION="0.1.7"
 
 CEM_LIB_BRANCH="master"
 CEM_LIB_URL1="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/${CEM_LIB_BRANCH}/EMail"
@@ -52,17 +52,18 @@ _DownloadLibraryScript_CEM_()
       if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] ; then return 1 ; fi
 
       curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
-           "${1}/$CEM_LIB_FILE_NAME" -o "$CEM_LIB_FILE_PATH"
+           "${1}/$CEM_LIB_FILE_NAME" -o "$libScriptFileDL"
 
-      if [ ! -s "$CEM_LIB_FILE_PATH" ] || \
-         grep -Eiq "^404: Not Found" "$CEM_LIB_FILE_PATH"
+      if [ ! -s "$libScriptFileDL" ] || \
+         grep -Eiq "^404: Not Found" "$libScriptFileDL"
       then
-          [ -s "$CEM_LIB_FILE_PATH" ] && { echo ; cat "$CEM_LIB_FILE_PATH" ; }
-          rm -f "$CEM_LIB_FILE_PATH"
+          [ -s "$libScriptFileDL" ] && { echo ; cat "$libScriptFileDL" ; }
+          rm -f "$libScriptFileDL"
           _Print_CEMdl_ "\n**ERROR**: Unable to download the library script [$CEM_LIB_FILE_NAME]\n"
           [ "$2" -lt "$urlDLMax" ] && _Print_CEMdl_ "Trying again with a different URL...\n"
           return 1
       else
+          mv -f "$libScriptFileDL" "$CEM_LIB_FILE_PATH"
           chmod 755 "$CEM_LIB_FILE_PATH"
           . "$CEM_LIB_FILE_PATH"
           [ "$2" -gt 1 ] && echo
@@ -75,6 +76,8 @@ _DownloadLibraryScript_CEM_()
    }
 
    local msgStr1  msgStr2  retCode  urlDLCount  urlDLMax
+   local libScriptFileDL="${CEM_LIB_FILE_PATH}.DL"
+
    case "$2" in
         update) msgStr1="Updating" ; msgStr2="updated" ;;
        install) msgStr1="Installing" ; msgStr2="installed" ;;
@@ -104,22 +107,32 @@ _DownloadLibraryScript_CEM_()
 #-----------------------------------------------------------#
 _CheckForLibraryScript_CEM_()
 {
-   local retCode=0
    local doDL_LibScriptMsge=""
    local doDL_LibScriptFlag=false
    local doDL_IsVerboseMode=true
+   local retCode=0  quietArg=""  doUpdateCheck=false
 
-   if [ $# -gt 0 ] && [ "$1" = "-quiet" ]
-   then doDL_IsVerboseMode=false
-   else doDL_IsVerboseMode=true
-   fi
+   for PARAM in "$@"
+   do 
+      case $PARAM in
+          "-quiet")
+              quietArg="$PARAM"
+              doDL_IsVerboseMode=false
+              ;;
+          "-updateCheck")
+              doUpdateCheck=true
+              ;;
+          *) ;; #IGNORED#
+      esac
+   done
 
-   if [ -f "$CEM_LIB_FILE_PATH" ]
+   if [ -s "$CEM_LIB_FILE_PATH" ]
    then
        . "$CEM_LIB_FILE_PATH"
 
        if [ -z "${CEM_LIB_VERSION:+xSETx}" ] || \
-           _CheckLibraryUpdates_CEM_ "$CEM_LIB_LOCAL_DIR" "$@"
+          { "$doUpdateCheck" && \
+            _CheckLibraryUpdates_CEM_ "$CEM_LIB_LOCAL_DIR" "$quietArg" ; }
        then
            retCode=1
            doDL_LibScriptFlag=true
