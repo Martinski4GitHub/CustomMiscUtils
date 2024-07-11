@@ -113,13 +113,13 @@ _CheckForLibraryScript_CEM_()
    local retCode=0  quietArg=""  doUpdateCheck=false
 
    for PARAM in "$@"
-   do 
+   do
       case $PARAM in
           "-quiet")
               quietArg="$PARAM"
               doDL_IsVerboseMode=false
               ;;
-          "-updateCheck")
+          "-versionCheck")
               doUpdateCheck=true
               ;;
           *) ;; #IGNORED#
