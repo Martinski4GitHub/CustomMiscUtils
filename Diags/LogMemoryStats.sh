@@ -34,7 +34,7 @@
 # the AMTM email configuration option has been already set up.
 #
 # Call to check for script version updates:
-#   LogMemoryStats.sh  -updateCheck [-quiet]
+#   LogMemoryStats.sh  -versionCheck [-quiet]
 #
 # FOR DIAGNOSTICS PURPOSES:
 # -------------------------
@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Jul-07 [Martinski W.]
+# Last Modified: 2024-Jul-10 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.3"
+readonly LMS_VERSION="0.7.4"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -87,13 +87,6 @@ maxLogFileSizeKB="$DEF_LogFileSizeKB"
 userMaxLogFileSize="$((maxLogFileSizeKB * 1024))"
 userLogDirectoryPath="$defLogDirectoryPath"
 
-readonly CEM_LIB_TAG="master"
-readonly CEM_LIB_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${CEM_LIB_TAG}/EMail"
-
-readonly CUSTOM_EMAIL_LIBDir="/jffs/addons/shared-libs"
-readonly CUSTOM_EMAIL_LIBName="CustomEMailFunctions.lib.sh"
-readonly CUSTOM_EMAIL_LIBFile="${CUSTOM_EMAIL_LIBDir}/$CUSTOM_EMAIL_LIBName"
-
 scriptDirPath="$(/usr/bin/dirname "$0")"
 [ "$scriptDirPath" = "." ] && scriptDirPath="$(pwd)"
 
@@ -101,6 +94,14 @@ readonly logMemStatsCFGdir="/jffs/configs"
 readonly logMemStatsCFGname="LogMemStatsConfig.txt"
 readonly logMemStatsCFGfile="${logMemStatsCFGdir}/$logMemStatsCFGname"
 readonly tmpEMailBodyFile="/tmp/var/tmp/tmpEMailBody_${scriptFileNTag}.$$.TXT"
+
+## The shared custom email library to support email notifications ##
+readonly ADDONS_SHARED_LIBS_DIR_PATH="/jffs/addons/shared-libs"
+readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
+readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME="DownloadCEMLibraryFile.lib.sh"
+readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
+readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
+readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/master/EMail"
 
 routerMODEL_ID="UNKNOWN"
 scriptLogFPath="${userLogDirectoryPath}/$scriptLogFName"
@@ -129,6 +130,32 @@ _WaitForEnterKey_()
    ! "$isInteractive" && return 0
    printf "\nPress <Enter> key to continue..."
    read -r EnterKEY ; echo
+}
+
+#-----------------------------------------------------------#
+_DownloadCEMLibraryHelperFile_()
+{
+   local tempScriptFileDL="${CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH}.DL"
+   _PrintMsg_ "\nDownloading the library helper script file to support email notifications...\n"
+
+   curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
+        ${CUSTOM_EMAIL_LIB_SCRIPT_URL}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME \
+        -o "$tempScriptFileDL"
+
+   if [ ! -s "$tempScriptFileDL" ] || \
+      grep -Eiq "^404: Not Found" "$tempScriptFileDL"
+   then
+       [ -s "$tempScriptFileDL" ] && { echo ; cat "$tempScriptFileDL" ; }
+       rm -f "$tempScriptFileDL"
+       _PrintMsg_ "\n**ERROR**: Unable to download the library helper script [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME]\n"
+       return 1
+   else
+       mv -f "$tempScriptFileDL" "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
+       chmod 755 "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
+       . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
+       _PrintMsg_ "The email library helper script [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] was downloaded.\n"
+       return 0
+   fi
 }
 
 #-----------------------------------------------------------#
@@ -239,37 +266,6 @@ _CheckLogFileSize_()
        rm -f "$scriptLogFPath"
        _PrintMsg_ "\nDeleted $scriptLogFPath [$theFileSize > $userMaxLogFileSize]\n\n"
    fi
-}
-
-#-----------------------------------------------------------#
-_DownloadLibraryFile_CEM_()
-{
-   local msgStr  retCode
-   case "$1" in
-        update) msgStr="Updating" ;;
-       install) msgStr="Installing" ;;
-             *) return 1 ;;
-   esac
-   _PrintMsg_ "\n${msgStr} the shared library script file to support email notifications...\n"
-
-   mkdir -m 755 -p "$CUSTOM_EMAIL_LIBDir"
-   curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
-   "${CEM_LIB_URL}/$CUSTOM_EMAIL_LIBName" -o "$CUSTOM_EMAIL_LIBFile"
-
-   if [ ! -s "$CUSTOM_EMAIL_LIBFile" ] || \
-      grep -Eiq "^404: Not Found" "$CUSTOM_EMAIL_LIBFile"
-   then
-       retCode=1
-       [ -s "$CUSTOM_EMAIL_LIBFile" ] && cat "$CUSTOM_EMAIL_LIBFile"
-       rm -f "$CUSTOM_EMAIL_LIBFile"
-       _PrintMsg_ "\n**ERROR**: Unable to download the shared library script file [$CUSTOM_EMAIL_LIBName].\n"
-   else
-       retCode=0
-       chmod 755 "$CUSTOM_EMAIL_LIBFile"
-       . "$CUSTOM_EMAIL_LIBFile"
-       _PrintMsg_ "\nDone.\n"
-   fi
-   return "$retCode"
 }
 
 #-----------------------------------------------------------------------#
@@ -819,7 +815,7 @@ _SendEMailNotification_()
    if [ -z "${amtmIsEMailConfigFileEnabled:+xSETx}" ]
    then
        logTag="**ERROR**_${scriptFileName}_$$"
-       logMsg="Email library script [$CUSTOM_EMAIL_LIBFile] *NOT* FOUND."
+       logMsg="Email library script [$CUSTOM_EMAIL_LIB_SCRIPT_FNAME] *NOT* FOUND."
        /usr/bin/logger -t "$logTag" "$logMsg"
        _PrintMsg_ "\n%s: %s\n\n" "$logTag" "$logMsg"
        return 1
@@ -1313,29 +1309,49 @@ _CPU_Temperature_()
    return 1
 }
 
-if [ $# -gt 0 ] && [ "$1" = "-updateCheck" ]
+quietArg=""
+updateArg=""
+downloadHelper=false
+
+for PARAM in "$@"
+do
+   case $PARAM in
+       "-quiet")
+           quietArg="$PARAM"
+           ;;
+       "-versionCheck")
+           updateArg="$PARAM"
+           ;;
+       "-download")
+          if [ $# -gt 1 ] && [ "$2" = "-cemdlhelper" ]
+          then downloadHelper=true ; fi
+          ;;
+       *) ;; #CONTINUE#
+   esac
+done
+
+if "$downloadHelper" || [ ! -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
+then _DownloadCEMLibraryHelperFile_ ; fi
+
+if [ -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
 then
-    shift
-    _CheckForScriptUpdates_ "$(pwd)" "$@"
+    . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
+    _CheckForLibraryScript_CEM_ "$updateArg" "$quietArg"
+else
+    _PrintMsg_ "\n**ERROR**: Helper script file [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] *NOT* FOUND.\n"
+
+    [ -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] && . "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
+fi
+
+if [ "$updateArg" = "-versionCheck" ]
+then
+    _CheckForScriptUpdates_ "$(pwd)" "$quietArg"
     exit $?
 fi
 
 _CheckConfigurationFile_
 _ValidateLogDirPath_ "$userLogDirectoryPath" "$prefLogDirectoryPath" "$altLogDirectoryPath"
 _CheckLogFileSize_
-
-if [ -f "$CUSTOM_EMAIL_LIBFile" ]
-then
-   . "$CUSTOM_EMAIL_LIBFile"
-
-   if [ -z "${CEM_LIB_VERSION:+xSETx}" ] || \
-       _CheckLibraryUpdates_CEM_ "$CUSTOM_EMAIL_LIBDir" -quiet
-   then
-       _DownloadLibraryFile_CEM_ "update"
-   fi
-else
-    _DownloadLibraryFile_CEM_ "install"
-fi
 
 [ -n "${amtmIsEMailConfigFileEnabled:+xSETx}" ] && \
 routerMODEL_ID="$(_GetRouterModelID_CEM_)"
@@ -1354,6 +1370,8 @@ then
            ;;
        -disableEmailNotification)
            _SetConfigurationOption_ isSendEmailNotificationsEnabled false
+           ;;
+       -download)  ## VALID Parameter ##
            ;;
        *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN Parameter [$1]\n\n"
           exit 1
