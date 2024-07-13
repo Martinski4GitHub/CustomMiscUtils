@@ -1,7 +1,7 @@
 #!/bin/sh
 ####################################################################
 # TEST_SendEMailNotification.sh
-# 
+#
 # To test using the "CustomEMailFunctions.lib.sh" shared library.
 # A simple example.
 #
@@ -11,11 +11,11 @@
 # but do *NOT* change the variable names.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Jul-09 [Martinski W.]
+# Last Modified: 2024-Jul-12 [Martinski W.]
 ####################################################################
 set -u
 
-TEST_VERSION="0.5.14"
+TEST_VERSION="0.5.15"
 
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
@@ -24,26 +24,29 @@ readonly scriptFileNTag="${scriptFileName%.*}"
 readonly ADDONS_SHARED_LIBS_DIR_PATH="/jffs/addons/shared-libs"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME="DownloadCEMLibraryFile.lib.sh"
+readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/master/EMail"
 
 #-----------------------------------------------------------#
 _DownloadCEMLibraryHelperFile_()
 {
+   local tempScriptFileDL="${CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH}.DL"
    printf "\nDownloading the library helper script file to support email notifications...\n"
 
    curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
         ${CUSTOM_EMAIL_LIB_SCRIPT_URL}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME \
-        -o "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
+        -o "$tempScriptFileDL"
 
-   if [ ! -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ] || \
-      grep -Eiq "^404: Not Found" "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
+   if [ ! -s "$tempScriptFileDL" ] || \
+      grep -Eiq "^404: Not Found" "$tempScriptFileDL"
    then
-       [ -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ] && { echo ; cat "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ; }
-       rm -f "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
+       [ -s "$tempScriptFileDL" ] && { echo ; cat "$tempScriptFileDL" ; }
+       rm -f "$tempScriptFileDL"
        printf "\n**ERROR**: Unable to download the library helper script [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME]\n"
        return 1
    else
+       mv -f "$tempScriptFileDL" "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
        chmod 755 "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
        . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
        printf "The email library helper script [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] was downloaded.\n"
@@ -51,18 +54,38 @@ _DownloadCEMLibraryHelperFile_()
    fi
 }
 
-if [ $# -gt 1 ] && [ "$1" = "download" ] && [ "$1" = "-cemdlhelper" ]
+cemailLibQuietArg=""
+cemailLibCheckArg=""
+cemailDownloadHelper=false
+
+for PARAM in "$@"
+do
+   case $PARAM in
+       "-quiet")
+           cemailLibQuietArg="$PARAM"
+           ;;
+       "-versionCheck")
+           cemailLibCheckArg="$PARAM"
+           ;;
+       "-download")
+          if [ $# -gt 1 ] && [ "$2" = "-cemdlhelper" ]
+          then cemailDownloadHelper=true ; fi
+          ;;
+       *) ;; #CONTINUE#
+   esac
+done
+
+if "$cemailDownloadHelper" || [ ! -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
 then _DownloadCEMLibraryHelperFile_ ; fi
 
-if [ ! -f "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
-then _DownloadCEMLibraryHelperFile_ ; fi
-
-if [ -f "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
+if [ -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
 then
     . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
-    _CheckForLibraryScript_CEM_ -quiet
+    _CheckForLibraryScript_CEM_ "$cemailLibCheckArg" "$cemailLibQuietArg"
 else
     printf "\n**ERROR**: Library helper script file [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] *NOT* FOUND.\n"
+
+    [ -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] && . "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
 fi
 
 #-----------------------------------------------------------#
