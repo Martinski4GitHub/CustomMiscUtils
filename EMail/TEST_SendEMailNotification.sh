@@ -11,11 +11,11 @@
 # but do *NOT* change the variable names.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Jul-12 [Martinski W.]
+# Last Modified: 2024-Jul-17 [Martinski W.]
 ####################################################################
 set -u
 
-TEST_VERSION="0.5.15"
+TEST_VERSION="0.5.16"
 
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
@@ -26,7 +26,7 @@ readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME="DownloadCEMLibraryFile.lib.sh"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
-readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/master/EMail"
+readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/master/EMail"
 
 #-----------------------------------------------------------#
 _DownloadCEMLibraryHelperFile_()
@@ -61,7 +61,7 @@ cemailDownloadHelper=false
 for PARAM in "$@"
 do
    case $PARAM in
-       "-quiet")
+       "-verbose" | "-quiet" | "-veryquiet")
            cemailLibQuietArg="$PARAM"
            ;;
        "-versionCheck")
