@@ -34,7 +34,7 @@
 # the AMTM email configuration option has been already set up.
 #
 # Call to check for script version updates:
-#   LogMemoryStats.sh  -versionCheck [-quiet]
+# LogMemoryStats.sh -versionCheck [-verbose | -quiet | -veryquiet]
 #
 # FOR DIAGNOSTICS PURPOSES:
 # -------------------------
@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Jul-10 [Martinski W.]
+# Last Modified: 2024-Jul-17 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.4"
+readonly LMS_VERSION="0.7.5"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -101,7 +101,7 @@ readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME="DownloadCEMLibraryFile.lib.sh"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
-readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/master/EMail"
+readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/master/EMail"
 
 routerMODEL_ID="UNKNOWN"
 scriptLogFPath="${userLogDirectoryPath}/$scriptLogFName"
@@ -185,7 +185,7 @@ _CheckForScriptUpdates_()
    local scriptVerNum  dlFileVerNum  dlFileVerStr
    local isVerboseMode  retCode
 
-   if [ $# -gt 1 ] && [ "$2" = "-quiet" ]
+   if [ $# -gt 1 ] && echo "$2" | grep -qE "^(-quiet|-veryquiet)$"
    then isVerboseMode=false ; else isVerboseMode=true ; fi
 
    "$isVerboseMode" && \
@@ -198,8 +198,8 @@ _CheckForScriptUpdates_()
       grep -Eiq "^404: Not Found" "$theVersTextFile"
    then
        [ -s "$theVersTextFile" ] && cat "$theVersTextFile"
-       rm -f "$theVersTextFile"
        _PrintMsg_ "\n**ERROR**: Could not download the version file [$LMS_VERFILE]\n"
+       rm -f "$theVersTextFile"
        return 1
    fi
    chmod 666 "$theVersTextFile"
@@ -211,11 +211,11 @@ _CheckForScriptUpdates_()
    if [ "$dlFileVerNum" -le "$scriptVerNum" ]
    then
        retCode=1
-       "$isVerboseMode" && _PrintMsg_ "\nDone.\n"
+       "$isVerboseMode" && _PrintMsg_ "Done.\n"
    else
        retCode=0
        "$isVerboseMode" && \
-       _PrintMsg_ "\nNew script version update [$dlFileVerStr] available.\n"
+       _PrintMsg_ "New script version update [$dlFileVerStr] available.\n"
    fi
 
    rm -f "$theVersTextFile"
@@ -1316,7 +1316,7 @@ downloadHelper=false
 for PARAM in "$@"
 do
    case $PARAM in
-       "-quiet")
+       "-verbose" | "-quiet" | "-veryquiet")
            quietArg="$PARAM"
            ;;
        "-versionCheck")

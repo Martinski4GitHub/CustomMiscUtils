@@ -2,7 +2,7 @@
 ####################################################################
 # FILENAME: DownloadCEMLibraryFile.lib.sh
 # TAG: _LIB_DownloadCEMLibraryFile_SHELL_
-# 
+#
 # Custom function to download the shared email library script.
 # This function checks 2 separate website URLs to download the
 # library script, just in the case the 1st one is unavailable.
@@ -13,7 +13,7 @@
 # but do *NOT* change the variable names.
 #
 # Creation Date: 2024-Jul-08 [Martinski W.]
-# Last Modified: 2024-Jul-10 [Martinski W.]
+# Last Modified: 2024-Jul-17 [Martinski W.]
 ####################################################################
 
 if [ -z "${_LIB_DownloadCEMLibraryFile_SHELL_:+xSETx}" ]
@@ -21,11 +21,11 @@ then _LIB_DownloadCEMLibraryFile_SHELL_=0
 else return 0
 fi
 
-CEM_DL_HELPER_VERSION="0.1.7"
+CEM_DL_HELPER_VERSION="0.1.8"
 
 CEM_LIB_BRANCH="master"
-CEM_LIB_URL1="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/${CEM_LIB_BRANCH}/EMail"
-CEM_LIB_URL2="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${CEM_LIB_BRANCH}/EMail"
+CEM_LIB_URL2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/${CEM_LIB_BRANCH}/EMail"
+CEM_LIB_URL1="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${CEM_LIB_BRANCH}/EMail"
 
 CEM_LIB_LOCAL_DIR="/jffs/addons/shared-libs"
 CEM_LIB_FILE_NAME="CustomEMailFunctions.lib.sh"
@@ -57,18 +57,21 @@ _DownloadLibraryScript_CEM_()
       if [ ! -s "$libScriptFileDL" ] || \
          grep -Eiq "^404: Not Found" "$libScriptFileDL"
       then
-          [ -s "$libScriptFileDL" ] && { echo ; cat "$libScriptFileDL" ; }
+          if [ "$2" -eq "$urlDLMax" ] || "$cemIsVerboseMode" || "$doDL_ShowErrorMsgs"
+          then
+              [ -s "$libScriptFileDL" ] && { echo ; cat "$libScriptFileDL" ; }
+              _Print_CEMdl_ "\n**ERROR**: Unable to download the library script [$CEM_LIB_FILE_NAME]\n"
+              [ "$2" -lt "$urlDLMax" ] && _Print_CEMdl_ "Trying again with a different URL...\n"
+          fi
           rm -f "$libScriptFileDL"
-          _Print_CEMdl_ "\n**ERROR**: Unable to download the library script [$CEM_LIB_FILE_NAME]\n"
-          [ "$2" -lt "$urlDLMax" ] && _Print_CEMdl_ "Trying again with a different URL...\n"
           return 1
       else
           mv -f "$libScriptFileDL" "$CEM_LIB_FILE_PATH"
           chmod 755 "$CEM_LIB_FILE_PATH"
           . "$CEM_LIB_FILE_PATH"
-          [ "$2" -gt 1 ] && echo
-          if [ "$2" -gt 1 ] || "$doDL_IsVerboseMode"
+          if "$cemIsVerboseMode" || { [ "$2" -gt 1 ] && "$doDL_ShowErrorMsgs" ; }
           then
+              [ "$2" -gt 1 ] && echo
               _Print_CEMdl_ "The email library script file [$CEM_LIB_FILE_NAME] was ${msgStr2}.\n"
           fi
           return 0
@@ -91,7 +94,7 @@ _DownloadLibraryScript_CEM_()
        return 1
    fi
 
-   "$doDL_IsVerboseMode" && \
+   "$cemIsVerboseMode" && \
    _Print_CEMdl_ "\n${msgStr1} the shared library script file to support email notifications...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
@@ -109,7 +112,7 @@ _CheckForLibraryScript_CEM_()
 {
    local doDL_LibScriptMsge=""
    local doDL_LibScriptFlag=false
-   local doDL_IsVerboseMode=true
+   local doDL_ShowErrorMsgs=true
    local retCode=0  quietArg=""  doUpdateCheck=false
 
    for PARAM in "$@"
@@ -117,7 +120,15 @@ _CheckForLibraryScript_CEM_()
       case $PARAM in
           "-quiet")
               quietArg="$PARAM"
-              doDL_IsVerboseMode=false
+              cemIsVerboseMode=false
+              ;;
+          "-veryquiet")
+              quietArg="$PARAM"
+              cemIsVerboseMode=false
+              doDL_ShowErrorMsgs=false
+              ;;
+          "-verbose")
+              cemIsVerboseMode=true
               ;;
           "-versionCheck")
               doUpdateCheck=true
