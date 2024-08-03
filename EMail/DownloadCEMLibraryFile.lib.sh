@@ -13,7 +13,7 @@
 # but do *NOT* change the variable names.
 #
 # Creation Date: 2024-Jul-08 [Martinski W.]
-# Last Modified: 2024-Jul-17 [Martinski W.]
+# Last Modified: 2024-Aug-03 [Martinski W.]
 ####################################################################
 
 if [ -z "${_LIB_DownloadCEMLibraryFile_SHELL_:+xSETx}" ]
@@ -21,7 +21,7 @@ then _LIB_DownloadCEMLibraryFile_SHELL_=0
 else return 0
 fi
 
-CEM_DL_HELPER_VERSION="0.1.8"
+CEM_DL_HELPER_VERSION="0.1.9"
 
 CEM_LIB_BRANCH="master"
 CEM_LIB_URL2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/${CEM_LIB_BRANCH}/EMail"
@@ -114,6 +114,8 @@ _CheckForLibraryScript_CEM_()
    local doDL_LibScriptFlag=false
    local doDL_ShowErrorMsgs=true
    local retCode=0  quietArg=""  doUpdateCheck=false
+   if [ -z "${cemIsVerboseMode:+xSETx}" ]
+   then cemIsVerboseMode=true ; fi
 
    for PARAM in "$@"
    do
