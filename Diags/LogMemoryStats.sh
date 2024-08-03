@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Jul-17 [Martinski W.]
+# Last Modified: 2024-Aug-03 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.5"
+readonly LMS_VERSION="0.7.6"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -136,6 +136,15 @@ _WaitForEnterKey_()
 _DownloadCEMLibraryHelperFile_()
 {
    local tempScriptFileDL="${CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH}.DL"
+
+   [ ! -d "$ADDONS_SHARED_LIBS_DIR_PATH" ] && \
+   mkdir -m 755 -p "$ADDONS_SHARED_LIBS_DIR_PATH" 2>/dev/null
+   if [ ! -d "$ADDONS_SHARED_LIBS_DIR_PATH" ]
+   then
+       _PrintMsg_ "\n**ERROR**: Directory Path [$ADDONS_SHARED_LIBS_DIR_PATH] *NOT* FOUND.\n"
+       return 1
+   fi
+
    _PrintMsg_ "\nDownloading the library helper script file to support email notifications...\n"
 
    curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \

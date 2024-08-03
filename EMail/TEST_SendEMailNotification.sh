@@ -11,11 +11,11 @@
 # but do *NOT* change the variable names.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Jul-17 [Martinski W.]
+# Last Modified: 2024-Aug-03 [Martinski W.]
 ####################################################################
 set -u
 
-TEST_VERSION="0.5.16"
+TEST_VERSION="0.5.17"
 
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
@@ -32,6 +32,15 @@ readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/Martinsk
 _DownloadCEMLibraryHelperFile_()
 {
    local tempScriptFileDL="${CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH}.DL"
+
+   [ ! -d "$ADDONS_SHARED_LIBS_DIR_PATH" ] && \
+   mkdir -m 755 -p "$ADDONS_SHARED_LIBS_DIR_PATH" 2>/dev/null
+   if [ ! -d "$ADDONS_SHARED_LIBS_DIR_PATH" ]
+   then
+       printf "\n**ERROR**: Directory Path [$ADDONS_SHARED_LIBS_DIR_PATH] *NOT* FOUND.\n"
+       return 1
+   fi
+
    printf "\nDownloading the library helper script file to support email notifications...\n"
 
    curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
@@ -99,7 +108,7 @@ _SendEMailNotification_()
    if [ -z "${amtmIsEMailConfigFileEnabled:+xSETx}" ]
    then
        logTag="**ERROR**_${scriptFileName}_$$"
-       logMsg="Email library script [$CUSTOM_EMAIL_LIB_SCRIPT_FNAME] *NOT* FOUND."
+       logMsg="Email library script [$CUSTOM_EMAIL_LIB_SCRIPT_FNAME] is *NOT* loaded."
        printf "\n%s: %s\n\n" "$logTag" "$logMsg"
        /usr/bin/logger -t "$logTag" "$logMsg"
        return 1
