@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Aug-03 [Martinski W.]
+# Last Modified: 2024-Sep-15 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.6"
+readonly LMS_VERSION="0.7.7"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -130,6 +130,39 @@ _WaitForEnterKey_()
    ! "$isInteractive" && return 0
    printf "\nPress <Enter> key to continue..."
    read -r EnterKEY ; echo
+}
+
+#-----------------------------------------------------------#
+_GetCurrentFWVersion_()
+{
+   local theVersionStr  extVersNum
+
+   fwInstalledBaseVers="$(nvram get firmver | sed 's/\.//g')"
+   fwInstalledBuildVers="$(nvram get buildno)"
+   fwInstalledExtendNum="$(nvram get extendno)"
+
+   extVersNum="$fwInstalledExtendNum"
+   echo "$extVersNum" | grep -qiE "^(alpha|beta)" && extVersNum="0_$extVersNum"
+   [ -z "$extVersNum" ] && extVersNum=0
+
+   theVersionStr="${fwInstalledBuildVers}.$extVersNum"
+   [ -n "$fwInstalledBaseVers" ] && \
+   theVersionStr="${fwInstalledBaseVers}.${theVersionStr}"
+
+   echo "$theVersionStr"
+}
+
+#-----------------------------------------------------------#
+_GetRouterModelID_()
+{
+   local retCode=1  routerModelID=""
+   local nvramModelKeys="odmpid wps_modelnum model build_name"
+   for nvramKey in $nvramModelKeys
+   do
+       routerModelID="$(nvram get "$nvramKey")"
+       [ -n "$routerModelID" ] && retCode=0 && break
+   done
+   echo "$routerModelID" ; return "$retCode"
 }
 
 #-----------------------------------------------------------#
@@ -969,8 +1002,8 @@ _CheckUsageThresholds_JFFS_()
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
    local returnAfterChecking=false
 
-   jffsMountStr="$(mount | grep '/jffs')"
-   jffsUsage="$(df -hT /jffs | grep -E '.*[[:blank:]]+jffs.*[[:blank:]]+/jffs$')"
+   jffsMountStr="$(mount | grep -E '[[:blank:]]+/jffs[[:blank:]]+')"
+   jffsUsage="$(df -hT /jffs | grep -E '.*[[:blank:]]+(jffs|ubifs).*[[:blank:]]+/jffs$')"
 
    if [ -z "$jffsMountStr" ] || [ -z "$jffsUsage" ]
    then
@@ -1358,12 +1391,12 @@ then
     exit $?
 fi
 
+routerInfo=false
+routerMODEL_ID="$(_GetRouterModelID_)"
+
 _CheckConfigurationFile_
 _ValidateLogDirPath_ "$userLogDirectoryPath" "$prefLogDirectoryPath" "$altLogDirectoryPath"
 _CheckLogFileSize_
-
-[ -n "${amtmIsEMailConfigFileEnabled:+xSETx}" ] && \
-routerMODEL_ID="$(_GetRouterModelID_CEM_)"
 
 if [ $# -gt 0 ] && [ -n "$1" ]
 then
@@ -1382,6 +1415,10 @@ then
            ;;
        -download)  ## VALID Parameter ##
            ;;
+       -info)
+           routerInfo=true
+           routerFWversion="$(_GetCurrentFWVersion_)"
+           ;;
        *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN Parameter [$1]\n\n"
           exit 1
     esac
@@ -1390,11 +1427,14 @@ fi
 {
    echo "=================================="
    date +"%Y-%b-%d, %I:%M:%S %p %Z (%a)"
+   "$routerInfo" && \
+   printf "Router Model: ${routerMODEL_ID}\nF/W Installed: ${routerFWversion}\n\n"
    printf "Uptime\n------\n" ; uptime ; echo
    _CPU_Temperature_ ; echo
    printf "free:\n" ; free ; echo
    _ProcMemInfo_ ; echo
-   df -hT | grep -E '(^Filesystem|/jffs$|/tmp$|/var$)' | sort -d -t ' ' -k 1
+   df -hT | head -n1
+   df -hT | grep -E '(/jffs$|/tmp$|/var$)' | sort -d -t ' ' -k 7
    echo
    case "$units" in
        kb|KB) printf "KBytes [du /tmp/]\n-----------------\n"
