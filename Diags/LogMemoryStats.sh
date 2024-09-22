@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Sep-15 [Martinski W.]
+# Last Modified: 2024-Sep-22 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.7"
+readonly LMS_VERSION="0.7.8"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -327,6 +327,8 @@ _CreateConfigurationFile_()
      echo "cpuLastEmailNotificationTime=0_INIT"
      echo "jffsEnableEmailNotifications=true"
      echo "jffsLastEmailNotificationTime=0_INIT"
+     echo "nvramEnableEmailNotifications=true"
+     echo "nvramLastEmailNotificationTime=0_INIT"
      echo "tmpfsEnableEmailNotifications=true"
      echo "tmpfsLastEmailNotificationTime=0_INIT"
      echo "isSendEmailNotificationsEnabled=false"
@@ -384,19 +386,29 @@ _ValidateConfigurationFile_()
        sed -i "8 i jffsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
        retCode=1
    fi
+   if ! grep -q "^nvramEnableEmailNotifications=" "$logMemStatsCFGfile"
+   then
+       sed -i "9 i nvramEnableEmailNotifications=true" "$logMemStatsCFGfile"
+       retCode=1
+   fi
+   if ! grep -q "^nvramLastEmailNotificationTime=" "$logMemStatsCFGfile"
+   then
+       sed -i "10 i nvramLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
+       retCode=1
+   fi
    if ! grep -q "^tmpfsEnableEmailNotifications=" "$logMemStatsCFGfile"
    then
-       sed -i "9 i tmpfsEnableEmailNotifications=true" "$logMemStatsCFGfile"
+       sed -i "11 i tmpfsEnableEmailNotifications=true" "$logMemStatsCFGfile"
        retCode=1
    fi
    if ! grep -q "^tmpfsLastEmailNotificationTime=" "$logMemStatsCFGfile"
    then
-       sed -i "10 i tmpfsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
+       sed -i "12 i tmpfsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
        retCode=1
    fi
    if ! grep -q "^isSendEmailNotificationsEnabled=" "$logMemStatsCFGfile"
    then
-       sed -i "11 i isSendEmailNotificationsEnabled=false" "$logMemStatsCFGfile"
+       sed -i "13 i isSendEmailNotificationsEnabled=false" "$logMemStatsCFGfile"
        retCode=1
    fi
 }
@@ -440,6 +452,9 @@ _SetConfigurationOption_()
             ;;
        jffsEnableEmailNotifications)
             jffsEnableEmailNotifications="$2"
+            ;;
+       nvramEnableEmailNotifications)
+            nvramEnableEmailNotifications="$2"
             ;;
        tmpfsEnableEmailNotifications)
             tmpfsEnableEmailNotifications="$2"
@@ -535,6 +550,23 @@ readonly jffsUsedThresholdRedAlert2=80
 readonly jffsUsedThresholdRedAlert3=85
 
 #-----------------------------------------------------------------------#
+# NVRAM Percent Usage Thresholds
+# >> 97% Used = Red Alert Level 3 [6 hrs]
+# >> 96% Used = Red Alert Level 2 [12 hrs]
+# >> 95% Used = Red Alert Level 1 [24 hrs]
+# >> 93% Used = Yellow Warning Level 2 [36 hrs]
+# >> 90% Used = Yellow Warning Level 1 [48 hrs]
+# <= 90% Used = Green OK
+#-----------------------------------------------------------------------#
+nvramUsageThresholdTestOnly=false
+readonly nvramUsedThresholdTestOnly=33
+readonly nvramUsedThresholdWarning1=90
+readonly nvramUsedThresholdWarning2=93
+readonly nvramUsedThresholdRedAlert1=95
+readonly nvramUsedThresholdRedAlert2=96
+readonly nvramUsedThresholdRedAlert3=97
+
+#-----------------------------------------------------------------------#
 # "tmpfs" Filesystem Percent Usage Thresholds
 # >> 90% Used = Red Alert Level 3 [6 hrs]
 # >> 85% Used = Red Alert Level 2 [12 hrs]
@@ -559,6 +591,8 @@ cpuEnableEmailNotifications=true
 cpuLastEmailNotificationTime="0_INIT"
 jffsEnableEmailNotifications=true
 jffsLastEmailNotificationTime="0_INIT"
+nvramEnableEmailNotifications=true
+nvramLastEmailNotificationTime="0_INIT"
 tmpfsEnableEmailNotifications=true
 tmpfsLastEmailNotificationTime="0_INIT"
 isSendEmailNotificationsEnabled=false
@@ -639,8 +673,8 @@ _CreateEMailContent_()
            emailBodyTitle="JFFS Usage: ${2}%"
            {
              printf "This notification is for <b>*TESTING*</b> purposes ONLY.\n\n"
-             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdTestOnly}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdTestOnly}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -652,8 +686,8 @@ _CreateEMailContent_()
            emailBodyTitle="JFFS Usage: ${2}%"
            {
              printf "<b>*WARNING*</b>\n"
-             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdWarning1}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdWarning1}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -665,8 +699,8 @@ _CreateEMailContent_()
            emailBodyTitle="JFFS Usage: ${2}%"
            {
              printf "<b>*WARNING*</b>\n"
-             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdWarning2}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdWarning2}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -678,8 +712,8 @@ _CreateEMailContent_()
            emailBodyTitle="JFFS Usage: ${2}%"
            {
              printf "<b>**ALERT**</b>\n"
-             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert1}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert1}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -691,8 +725,8 @@ _CreateEMailContent_()
            emailBodyTitle="JFFS Usage: ${2}%"
            {
              printf "<b>**ALERT**</b>\n"
-             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert2}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert2}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -704,8 +738,8 @@ _CreateEMailContent_()
            emailBodyTitle="JFFS Usage: ${2}%"
            {
              printf "<b>**ALERT**</b>\n"
-             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert3}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert3}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -731,6 +765,89 @@ _CreateEMailContent_()
              printf "Router JFFS partition is mounted <b>READ-ONLY</b>.\n"
            } > "$tmpEMailBodyFile"
            ;;
+       NVRAM_USED_TestOnly)
+           timeStampID=nvram
+           minTimeDiffSecs=0
+           nextTimeStampTag=TEST
+           emailSubject="Router NVRAM Usage [TESTING]"
+           emailBodyTitle="NVRAM Usage: ${2}%"
+           {
+             printf "This notification is for <b>*TESTING*</b> purposes ONLY.\n\n"
+             printf "Router NVRAM usage of <b>${2}%%</b> exceeds <b>${nvramUsedThresholdTestOnly}%%</b>.\n"
+             printf "\n%s\n" "$3"
+           } > "$tmpEMailBodyFile"
+           ;;
+       NVRAM_USED_Warning1)
+           timeStampID=nvram
+           minTimeDiffSecs="$((onehrSecs * 48))"
+           nextTimeStampTag=YLW1
+           emailSubject="Router NVRAM Usage WARNING"
+           emailBodyTitle="NVRAM Usage: ${2}%"
+           {
+             printf "<b>*WARNING*</b>\n"
+             printf "Router NVRAM usage of <b>${2}%%</b> exceeds <b>${nvramUsedThresholdWarning1}%%</b>.\n"
+             printf "\n%s\n" "$3"
+           } > "$tmpEMailBodyFile"
+           ;;
+       NVRAM_USED_Warning2)
+           timeStampID=nvram
+           minTimeDiffSecs="$((onehrSecs * 36))"
+           nextTimeStampTag=YLW2
+           emailSubject="Router NVRAM Usage WARNING"
+           emailBodyTitle="NVRAM Usage: ${2}%"
+           {
+             printf "<b>*WARNING*</b>\n"
+             printf "Router NVRAM usage of <b>${2}%%</b> exceeds <b>${nvramUsedThresholdWarning2}%%</b>.\n"
+             printf "\n%s\n" "$3"
+           } > "$tmpEMailBodyFile"
+           ;;
+       NVRAM_USED_RedAlert1)
+           timeStampID=nvram
+           minTimeDiffSecs="$((onehrSecs * 24))"
+           nextTimeStampTag=RED1
+           emailSubject="Router NVRAM Usage ALERT"
+           emailBodyTitle="NVRAM Usage: ${2}%"
+           {
+             printf "<b>**ALERT**</b>\n"
+             printf "Router NVRAM usage of <b>${2}%%</b> exceeds <b>${nvramUsedThresholdRedAlert1}%%</b>.\n"
+             printf "\n%s\n" "$3"
+           } > "$tmpEMailBodyFile"
+           ;;
+       NVRAM_USED_RedAlert2)
+           timeStampID=nvram
+           minTimeDiffSecs="$((onehrSecs * 12))"
+           nextTimeStampTag=RED2
+           emailSubject="Router NVRAM Usage ALERT"
+           emailBodyTitle="NVRAM Usage: ${2}%"
+           {
+             printf "<b>**ALERT**</b>\n"
+             printf "Router NVRAM usage of <b>${2}%%</b> exceeds <b>${nvramUsedThresholdRedAlert2}%%</b>.\n"
+             printf "\n%s\n" "$3"
+           } > "$tmpEMailBodyFile"
+           ;;
+       NVRAM_USED_RedAlert3)
+           timeStampID=nvram
+           minTimeDiffSecs="$((onehrSecs * 6))"
+           nextTimeStampTag=RED3
+           emailSubject="Router NVRAM Usage ALERT"
+           emailBodyTitle="NVRAM Usage: ${2}%"
+           {
+             printf "<b>**ALERT**</b>\n"
+             printf "Router NVRAM usage of <b>${2}%%</b> exceeds <b>${nvramUsedThresholdRedAlert3}%%</b>.\n"
+             printf "\n%s\n" "$3"
+           } > "$tmpEMailBodyFile"
+           ;;
+       NVRAM_NOT_FOUND)
+           timeStampID=nvram
+           minTimeDiffSecs="$((onehrSecs * 6))"
+           nextTimeStampTag=RED4
+           emailSubject="Router NVRAM NOT Found"
+           emailBodyTitle="NVRAM was *NOT* Found"
+           {
+             printf "<b>**ALERT**</b>\n"
+             printf "Router NVRAM was <b>NOT</b> found.\n"
+           } > "$tmpEMailBodyFile"
+           ;;
        TMPFS_USED_TestOnly)
            timeStampID=tmpfs
            minTimeDiffSecs=0
@@ -739,8 +856,8 @@ _CreateEMailContent_()
            emailBodyTitle="TMPFS Usage: ${2}%"
            {
              printf "This notification is for <b>*TESTING*</b> purposes ONLY.\n\n"
-             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdTestOnly}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdTestOnly}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -752,8 +869,8 @@ _CreateEMailContent_()
            emailBodyTitle="TMPFS Usage: ${2}%"
            {
              printf "<b>*WARNING*</b>\n"
-             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdWarning1}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdWarning1}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -765,8 +882,8 @@ _CreateEMailContent_()
            emailBodyTitle="TMPFS Usage: ${2}%"
            {
              printf "<b>*WARNING*</b>\n"
-             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdWarning2}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdWarning2}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -778,8 +895,8 @@ _CreateEMailContent_()
            emailBodyTitle="TMPFS Usage: ${2}%"
            {
              printf "<b>**ALERT**</b>\n"
-             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert1}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert1}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -791,8 +908,8 @@ _CreateEMailContent_()
            emailBodyTitle="TMPFS Usage: ${2}%"
            {
              printf "<b>**ALERT**</b>\n"
-             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert2}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert2}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -804,8 +921,8 @@ _CreateEMailContent_()
            emailBodyTitle="TMPFS Usage: ${2}%"
            {
              printf "<b>**ALERT**</b>\n"
-             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert3}%%</b>."
-             printf "\n\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert3}%%</b>.\n"
+             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -925,6 +1042,84 @@ _InfoHRdu_()
 }
 
 #-----------------------------------------------------------------------#
+_NVRAM_GetUsageInfo_()
+{
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
+   then echo "*ERROR**: NO Parameters" ; return 1 ; fi
+
+   _GetFloat_() { printf "%.2f" "$(echo "$1" | awk "{print $1}")" ; }
+
+   printf "NVRAM Used:  %7d Bytes = %6.2f KB [%4.1f%%]\n" \
+          "$1" "$(_GetFloat_ "($1 / 1024)")" "$(_GetFloat_ "($1 * 100 / $3)")"
+   printf "NVRAM Free:  %7d Bytes = %6.2f KB [%4.1f%%]\n" \
+          "$2" "$(_GetFloat_ "($2 / 1024)")" "$(_GetFloat_ "($2 * 100 / $3)")"
+   printf "NVRAM Total: %7d Bytes = %6.2f KB\n" \
+          "$3" "$(_GetFloat_ "($3 / 1024)")"
+}
+
+#-----------------------------------------------------------------------#
+_Show_NVRAM_Usage_()
+{
+   local tempFile  nvramUsageStr  total  usedx  freex
+   tempFile="${HOME}/nvramUsage.txt"
+   nvram show 1>/dev/null 2>"$tempFile"
+   nvramUsageStr="$(grep -i "^size:" "$tempFile")"
+   rm -f "$tempFile"
+
+   if [ -z "$nvramUsageStr" ]
+   then
+       printf "\n**ERROR**: NVRAM size info is NOT found.\n"
+       return 1
+   fi
+   printf "\nNVRAM Usage:\n%s\n" "$nvramUsageStr"
+   usedx="$(echo "$nvramUsageStr" | awk -F ' ' '{print $2}')"
+   freex="$(echo "$nvramUsageStr" | awk -F ' ' '{print $4}')"
+   freex="$(echo "$freex" | sed 's/[()]//g')"
+   total="$((usedx + freex))"
+   echo
+   _NVRAM_GetUsageInfo_ "$usedx" "$freex" "$total"
+   echo
+}
+
+#-----------------------------------------------------------------------#
+_Show_JFFS_Usage_()
+{
+   _GetFloat_() { printf "%.2f" "$(echo "$1" | awk "{print $1}")" ; }
+   local jffsMountStr  jffsUsageStr  typex  total  usedx  freex  totalx
+
+   jffsMountStr="$(mount | grep -E '[[:blank:]]+/jffs[[:blank:]]+')"
+   jffsUsageStr="$(df -kT /jffs | grep -E '.*[[:blank:]]+(jffs|ubifs).*[[:blank:]]+/jffs$')"
+
+   if [ -z "$jffsMountStr" ] || [ -z "$jffsUsageStr" ]
+   then
+       printf "\n**ERROR**: JFFS partition is NOT found mounted.\n"
+       return 1
+   fi
+   typex="$(echo "$jffsUsageStr" | awk -F ' ' '{print $2}')"
+   total="$(echo "$jffsUsageStr" | awk -F ' ' '{print $3}')"
+   usedx="$(echo "$jffsUsageStr" | awk -F ' ' '{print $4}')"
+   freex="$(echo "$jffsUsageStr" | awk -F ' ' '{print $5}')"
+   totalx="$total"
+
+   if [ "$typex" = "ubifs" ] && [ "$((usedx + freex))" -ne "$total" ]
+   then totalx="$((usedx + freex))" ; fi
+   echo
+   printf "JFFS Used:  %6d KB = %5.2f MB [%4.1f%%]\n" \
+          "$usedx" "$(_GetFloat_ "($usedx / 1024)")" "$(_GetFloat_ "($usedx * 100 / $totalx)")"
+   printf "JFFS Free:  %6d KB = %5.2f MB [%4.1f%%]\n" \
+          "$freex" "$(_GetFloat_ "($freex / 1024)")" "$(_GetFloat_ "($freex * 100 / $totalx)")"
+   printf "JFFS Total: %6d KB = %5.2f MB\n" \
+          "$total" "$(_GetFloat_ "($total / 1024)")"
+
+   if echo "$jffsMountStr" | grep -qE "[[:blank:]]+[(]?ro[[:blank:],]"
+   then
+       printf "\nMount Point:\n" ; echo "${jffsMountStr}"
+       printf "\n**WARNING**\n"
+       printf "JFFS partition appears to be READ-ONLY.\n"
+   fi
+}
+
+#-----------------------------------------------------------------------#
 _JFFS_MailUsageNotification_()
 {
    if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || \
@@ -998,14 +1193,14 @@ _JFFS_ShowUsageNotification_()
 #-----------------------------------------------------------------------#
 _CheckUsageThresholds_JFFS_()
 {
-   local jffsMountStr  jffsUsage  percentNum=0  doConfigUpdate
+   local jffsMountStr  jffsUsageStr  percentNum=0  doConfigUpdate
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
    local returnAfterChecking=false
 
    jffsMountStr="$(mount | grep -E '[[:blank:]]+/jffs[[:blank:]]+')"
-   jffsUsage="$(df -hT /jffs | grep -E '.*[[:blank:]]+(jffs|ubifs).*[[:blank:]]+/jffs$')"
+   jffsUsageStr="$(df -kT /jffs | grep -E '.*[[:blank:]]+(jffs|ubifs).*[[:blank:]]+/jffs$')"
 
-   if [ -z "$jffsMountStr" ] || [ -z "$jffsUsage" ]
+   if [ -z "$jffsMountStr" ] || [ -z "$jffsUsageStr" ]
    then
        _JFFS_ShowUsageNotification_ JFFS_NOT_MOUNTED UNKNOWN UNKNOWN
        _JFFS_MailUsageNotification_ JFFS_NOT_MOUNTED UNKNOWN UNKNOWN
@@ -1019,8 +1214,7 @@ _CheckUsageThresholds_JFFS_()
        returnAfterChecking=true
    fi
 
-   [ -n "$jffsUsage" ] && \
-   percentNum="$(echo "$jffsUsage" | awk -F ' ' '{print $6}')"
+   percentNum="$(echo "$jffsUsageStr" | awk -F ' ' '{print $6}')"
    percentNum="$(echo "$percentNum" | awk -F '%' '{print $1}')"
 
    [ "$percentNum" -eq 0 ] && return 1
@@ -1028,38 +1222,38 @@ _CheckUsageThresholds_JFFS_()
    if "$jffsUsageThresholdTestOnly" && \
       [ "$percentNum" -gt "$jffsUsedThresholdTestOnly" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsUsage"
-       _JFFS_MailUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsUsage"
+       _JFFS_ShowUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsUsageStr"
+       _JFFS_MailUsageNotification_ JFFS_USED_TestOnly "$percentNum" "$jffsUsageStr"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert3" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsUsage"
-       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsUsage"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsUsageStr"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert3 "$percentNum" "$jffsUsageStr"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert2" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsUsage"
-       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsUsage"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsUsageStr"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert2 "$percentNum" "$jffsUsageStr"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdRedAlert1" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsUsage"
-       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsUsage"
+       _JFFS_ShowUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsUsageStr"
+       _JFFS_MailUsageNotification_ JFFS_USED_RedAlert1 "$percentNum" "$jffsUsageStr"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdWarning2" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsUsage"
-       _JFFS_MailUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsUsage"
+       _JFFS_ShowUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsUsageStr"
+       _JFFS_MailUsageNotification_ JFFS_USED_Warning2 "$percentNum" "$jffsUsageStr"
        return 0
    fi
    if [ "$percentNum" -gt "$jffsUsedThresholdWarning1" ]
    then
-       _JFFS_ShowUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsUsage"
-       _JFFS_MailUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsUsage"
+       _JFFS_ShowUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsUsageStr"
+       _JFFS_MailUsageNotification_ JFFS_USED_Warning1 "$percentNum" "$jffsUsageStr"
        return 0
    fi
 
@@ -1075,6 +1269,152 @@ _CheckUsageThresholds_JFFS_()
 
    "$doConfigUpdate" && \
    _SetConfigurationOption_ jffsLastEmailNotificationTime "${percentNum}_GRN"
+   return 0
+}
+
+#-----------------------------------------------------------------------#
+_NVRAM_MailUsageNotification_()
+{
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || \
+      ! "$isSendEmailNotificationsEnabled" || \
+      ! "$nvramEnableEmailNotifications"
+   then return 1 ; fi
+
+   _SendEMailNotification_ "$@"
+}
+
+#-----------------------------------------------------------------------#
+_NVRAM_ShowUsageNotification_()
+{
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
+   then return 1 ; fi
+
+   local logMsg  theUsageThreshold
+
+   case "$1" in
+       NVRAM_NOT_FOUND)
+           {
+             printf "\n**ALERT**\n"
+             printf "NVRAM was NOT found.\n"
+           } >> "$tempLogFPath"
+           return 0
+           ;;
+       NVRAM_USED_TestOnly)
+           theUsageThreshold="$nvramUsedThresholdTestOnly"
+           logMsg="This notification is for **TESTING** purposes ONLY."
+           ;;
+       NVRAM_USED_Warning1)
+           theUsageThreshold="$nvramUsedThresholdWarning1"
+           logMsg="**WARNING**"
+           ;;
+       NVRAM_USED_Warning2)
+           theUsageThreshold="$nvramUsedThresholdWarning2"
+           logMsg="**WARNING**"
+           ;;
+       NVRAM_USED_RedAlert1)
+           theUsageThreshold="$nvramUsedThresholdRedAlert1"
+           logMsg="**ALERT**"
+           ;;
+       NVRAM_USED_RedAlert2)
+           theUsageThreshold="$nvramUsedThresholdRedAlert2"
+           logMsg="**ALERT**"
+           ;;
+       NVRAM_USED_RedAlert3)
+           theUsageThreshold="$nvramUsedThresholdRedAlert3"
+           logMsg="**ALERT**"
+           ;;
+       *) _PrintMsg_ "\n**ERROR**: UNKNOWN NVRAM Usage Parameter [$1]\n"
+           return 1
+           ;;
+   esac
+   {
+     printf "\n${logMsg}\n"
+     printf "NVRAM usage of ${2}%% exceeds ${theUsageThreshold}%%."
+     printf "\n%s\n" "$3"
+   } >> "$tempLogFPath"
+   return 0
+}
+
+#-----------------------------------------------------------------------#
+_CheckUsageThresholds_NVRAM_()
+{
+   _GetFloat_() { printf "%.1f" "$(echo "$1" | awk "{print $1}")" ; }
+   _GetIntgr_() { printf "%.0f" "$(echo "$1" | awk "{print $1}")" ; }
+
+   local tempFile  nvramUsageStr  total  usedx  freex
+   local percentNum=0  doConfigUpdate  percentIntgr  percentFloat
+   local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
+
+   tempFile="${HOME}/nvramUsage.txt"
+   nvram show 1>/dev/null 2>"$tempFile"
+   nvramUsageStr="$(grep -i "^size:" "$tempFile")"
+   rm -f "$tempFile"
+
+   if [ -z "$nvramUsageStr" ]
+   then
+       _NVRAM_ShowUsageNotification_ NVRAM_NOT_FOUND UNKNOWN UNKNOWN
+       _NVRAM_MailUsageNotification_ NVRAM_NOT_FOUND UNKNOWN UNKNOWN
+       return 0
+       printf "\n**ERROR**: NVRAM size info is NOT found.\n"
+   fi
+   usedx="$(echo "$nvramUsageStr" | awk -F ' ' '{print $2}')"
+   freex="$(echo "$nvramUsageStr" | awk -F ' ' '{print $4}')"
+   freex="$(echo "$freex" | sed 's/[()]//g')"
+   total="$((usedx + freex))"
+
+   percentFloat="$(_GetFloat_ "($usedx * 100 / $total)")"
+   percentIntgr="$(_GetIntgr_ "($percentFloat * 10)")"
+   [ "$percentIntgr" -eq 0 ] && return 1
+   nvramUsageStr="$(_NVRAM_GetUsageInfo_ "$usedx" "$freex" "$total")"
+
+   if "$nvramUsageThresholdTestOnly" && \
+      [ "$percentIntgr" -gt "${nvramUsedThresholdTestOnly}5" ]
+   then
+       _NVRAM_ShowUsageNotification_ NVRAM_USED_TestOnly "$percentFloat" "$nvramUsageStr"
+       _NVRAM_MailUsageNotification_ NVRAM_USED_TestOnly "$percentFloat" "$nvramUsageStr"
+       return 0
+   fi
+   if [ "$percentIntgr" -gt "${nvramUsedThresholdRedAlert3}5" ]
+   then
+       _NVRAM_ShowUsageNotification_ NVRAM_USED_RedAlert3 "$percentFloat" "$nvramUsageStr"
+       _NVRAM_MailUsageNotification_ NVRAM_USED_RedAlert3 "$percentFloat" "$nvramUsageStr"
+       return 0
+   fi
+   if [ "$percentIntgr" -gt "${nvramUsedThresholdRedAlert2}5" ]
+   then
+       _NVRAM_ShowUsageNotification_ NVRAM_USED_RedAlert2 "$percentFloat" "$nvramUsageStr"
+       _NVRAM_MailUsageNotification_ NVRAM_USED_RedAlert2 "$percentFloat" "$nvramUsageStr"
+       return 0
+   fi
+   if [ "$percentIntgr" -gt "${nvramUsedThresholdRedAlert1}5" ]
+   then
+       _NVRAM_ShowUsageNotification_ NVRAM_USED_RedAlert1 "$percentFloat" "$nvramUsageStr"
+       _NVRAM_MailUsageNotification_ NVRAM_USED_RedAlert1 "$percentFloat" "$nvramUsageStr"
+       return 0
+   fi
+   if [ "$percentIntgr" -gt "${nvramUsedThresholdWarning2}5" ]
+   then
+       _NVRAM_ShowUsageNotification_ NVRAM_USED_Warning2 "$percentFloat" "$nvramUsageStr"
+       _NVRAM_MailUsageNotification_ NVRAM_USED_Warning2 "$percentFloat" "$nvramUsageStr"
+       return 0
+   fi
+   if [ "$percentIntgr" -gt "${nvramUsedThresholdWarning1}5" ]
+   then
+       _NVRAM_ShowUsageNotification_ NVRAM_USED_Warning1 "$percentFloat" "$nvramUsageStr"
+       _NVRAM_MailUsageNotification_ NVRAM_USED_Warning1 "$percentFloat" "$nvramUsageStr"
+       return 0
+   fi
+
+   doConfigUpdate=false
+   prevTimeStampStr="$(_GetConfigurationOption_ nvramLastEmailNotificationTime)"
+   prevTimeStampSec="$(echo "$prevTimeStampStr" | awk -F '_' '{print $1}')"
+   prevTimeStampTag="$(echo "$prevTimeStampStr" | awk -F '_' '{print $2}')"
+
+   if [ -z "$prevTimeStampTag" ] || [ "$prevTimeStampTag" != "GRN" ]
+   then doConfigUpdate=true ; fi
+
+   "$doConfigUpdate" && \
+   _SetConfigurationOption_ nvramLastEmailNotificationTime "${percentIntgr}_GRN"
    return 0
 }
 
@@ -1142,11 +1482,12 @@ _CheckUsageThresholds_TMPFS_()
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
 
    tmpfsUsage="$(df -hT | grep -E '^tmpfs[[:blank:]]+tmpfs .*[[:blank:]]+/tmp$')"
-   [ -n "$tmpfsUsage" ] && \
-   percentNum="$(echo "$tmpfsUsage" | awk -F ' ' '{print $6}')"
-   percentNum="$(echo "$percentNum" | awk -F '%' '{print $1}')"
-
-   [ "$percentNum" -eq 0 ] && return 1
+   if [ -n "$tmpfsUsage" ]
+   then
+       percentNum="$(echo "$tmpfsUsage" | awk -F ' ' '{print $6}')"
+       percentNum="$(echo "$percentNum" | awk -F '%' '{print $1}')"
+   fi
+   if [ -z "$percentNum" ] || [ "$percentNum" -eq 0 ] ; then return 1 ; fi
 
    if "$tmpfsUsageThresholdTestOnly" && \
       [ "$percentNum" -gt "$tmpfsUsedThresholdTestOnly" ]
@@ -1252,19 +1593,15 @@ _CPU_ShowTemperatureNotification_()
 #-----------------------------------------------------------------------#
 _CheckTemperatureThresholds_CPU_()
 {
-   if ! echo "$cpuTemperatureCelsius" | grep -qE '^[1-9]+[.]?[0-9]+$'
+   if ! echo "$cpuTemperatureCelsius" | grep -qE '^[1-9][0-9]?[.]?[0-9]+$'
    then return 1 ; fi
 
-   _TempInteger_()
-   {
-       local tmpNum="$(echo "$1" | awk "{print $1}")"
-       printf "%.0f" "$tmpNum"
-   }
+   _GetIntgr_() { printf "%.0f" "$(echo "$1" | awk "{print $1}")" ; }
 
    local doConfigUpdate  tempIntgr  tempFloat
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
 
-   tempIntgr="$(_TempInteger_ "($cpuTemperatureCelsius * 10)")"
+   tempIntgr="$(_GetIntgr_ "($cpuTemperatureCelsius * 10)")"
    tempFloat="$(printf "%.1f" "$cpuTemperatureCelsius")"
 
    if "$cpuTempThresholdTestOnly" && \
@@ -1407,20 +1744,22 @@ then
            ;;
         -tmpfstest) tmpfsUsageThresholdTestOnly=true  ##TEST ONLY##
            ;;
-       -enableEmailNotification)
+        -nvramtest) nvramUsageThresholdTestOnly=true  ##TEST ONLY##
+           ;;
+        -enableEmailNotification)
            _SetConfigurationOption_ isSendEmailNotificationsEnabled true
            ;;
-       -disableEmailNotification)
+        -disableEmailNotification)
            _SetConfigurationOption_ isSendEmailNotificationsEnabled false
            ;;
-       -download)  ## VALID Parameter ##
+        -download)  ## VALID Parameter ##
            ;;
-       -info)
+        -info)
            routerInfo=true
            routerFWversion="$(_GetCurrentFWVersion_)"
            ;;
-       *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN Parameter [$1]\n\n"
-          exit 1
+        *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN Parameter [$1]\n\n"
+           exit 1
     esac
 fi
 
@@ -1435,7 +1774,8 @@ fi
    _ProcMemInfo_ ; echo
    df -hT | head -n1
    df -hT | grep -E '(/jffs$|/tmp$|/var$)' | sort -d -t ' ' -k 7
-   echo
+   _Show_JFFS_Usage_
+   _Show_NVRAM_Usage_
    case "$units" in
        kb|KB) printf "KBytes [du /tmp/]\n-----------------\n"
               _InfoKBdu_ "/tmp" 15
@@ -1461,6 +1801,7 @@ fi
 } > "$tempLogFPath"
 
 _CheckUsageThresholds_JFFS_
+_CheckUsageThresholds_NVRAM_
 _CheckUsageThresholds_TMPFS_
 _CheckTemperatureThresholds_CPU_
 
