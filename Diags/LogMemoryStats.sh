@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Sep-22 [Martinski W.]
+# Last Modified: 2024-Sep-28 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.8"
+readonly LMS_VERSION="0.7.9"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -103,7 +103,6 @@ readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_E
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/master/EMail"
 
-routerMODEL_ID="UNKNOWN"
 scriptLogFPath="${userLogDirectoryPath}/$scriptLogFName"
 backupLogFPath="${userLogDirectoryPath}/$backupLogFName"
 
@@ -313,7 +312,7 @@ _CheckLogFileSize_()
 #-----------------------------------------------------------------------#
 _CreateConfigurationFile_()
 {
-   [ -f "$logMemStatsCFGfile" ] && return 0
+   [ -s "$logMemStatsCFGfile" ] && return 0
    [ ! -d "$logMemStatsCFGdir" ] && \
    mkdir -m 755 "$logMemStatsCFGdir" 2>/dev/null
    [ ! -d "$logMemStatsCFGdir" ] && return 1
@@ -352,8 +351,9 @@ _ValidateConfigurationFile_()
        dateTimeStr="## $(date +'%Y-%b-%d, %I:%M:%S %p %Z') ##"
        sed -i "1 i $dateTimeStr" "$logMemStatsCFGfile"
    fi
-   if ! grep -q "^maxLogFileSizeKB=" "$logMemStatsCFGfile"
+   if ! grep -qE "^maxLogFileSizeKB=[1-9][0-9]+$" "$logMemStatsCFGfile"
    then
+       sed -i "/^maxLogFileSizeKB=/d" "$logMemStatsCFGfile"
        sed -i "2 i maxLogFileSizeKB=$DEF_LogFileSizeKB" "$logMemStatsCFGfile"
    fi
    if ! grep -q "^userLogDirectoryPath=" "$logMemStatsCFGfile"
@@ -366,8 +366,9 @@ _ValidateConfigurationFile_()
        sed -i "4 i prefLogDirectoryPath=\"${defLogDirectoryPath}\"" "$logMemStatsCFGfile"
        retCode=1
    fi
-   if ! grep -q "^cpuEnableEmailNotifications=" "$logMemStatsCFGfile"
+   if ! grep -qE "^cpuEnableEmailNotifications=(true|false)$" "$logMemStatsCFGfile"
    then
+       sed -i "/^cpuEnableEmailNotifications=/d" "$logMemStatsCFGfile"
        sed -i "5 i cpuEnableEmailNotifications=true" "$logMemStatsCFGfile"
        retCode=1
    fi
@@ -376,8 +377,9 @@ _ValidateConfigurationFile_()
        sed -i "6 i cpuLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
        retCode=1
    fi
-   if ! grep -q "^jffsEnableEmailNotifications=" "$logMemStatsCFGfile"
+   if ! grep -qE "^jffsEnableEmailNotifications=(true|false)$" "$logMemStatsCFGfile"
    then
+       sed -i "/^jffsEnableEmailNotifications=/d" "$logMemStatsCFGfile"
        sed -i "7 i jffsEnableEmailNotifications=true" "$logMemStatsCFGfile"
        retCode=1
    fi
@@ -386,8 +388,9 @@ _ValidateConfigurationFile_()
        sed -i "8 i jffsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
        retCode=1
    fi
-   if ! grep -q "^nvramEnableEmailNotifications=" "$logMemStatsCFGfile"
+   if ! grep -qE "^nvramEnableEmailNotifications=(true|false)$" "$logMemStatsCFGfile"
    then
+       sed -i "/^nvramEnableEmailNotifications=/d" "$logMemStatsCFGfile"
        sed -i "9 i nvramEnableEmailNotifications=true" "$logMemStatsCFGfile"
        retCode=1
    fi
@@ -396,8 +399,9 @@ _ValidateConfigurationFile_()
        sed -i "10 i nvramLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
        retCode=1
    fi
-   if ! grep -q "^tmpfsEnableEmailNotifications=" "$logMemStatsCFGfile"
+   if ! grep -qE "^tmpfsEnableEmailNotifications=(true|false)$" "$logMemStatsCFGfile"
    then
+       sed -i "/^tmpfsEnableEmailNotifications=/d" "$logMemStatsCFGfile"
        sed -i "11 i tmpfsEnableEmailNotifications=true" "$logMemStatsCFGfile"
        retCode=1
    fi
@@ -406,9 +410,10 @@ _ValidateConfigurationFile_()
        sed -i "12 i tmpfsLastEmailNotificationTime=0_INIT" "$logMemStatsCFGfile"
        retCode=1
    fi
-   if ! grep -q "^isSendEmailNotificationsEnabled=" "$logMemStatsCFGfile"
+   if ! grep -qE "^isSendEmailNotificationsEnabled=(true|false)$" "$logMemStatsCFGfile"
    then
-       sed -i "13 i isSendEmailNotificationsEnabled=false" "$logMemStatsCFGfile"
+       sed -i "/^isSendEmailNotificationsEnabled=/d" "$logMemStatsCFGfile"
+       echo "isSendEmailNotificationsEnabled=false" >> "$logMemStatsCFGfile"
        retCode=1
    fi
 }
@@ -417,7 +422,7 @@ _ValidateConfigurationFile_()
 _GetConfigurationOption_()
 {
    if [ $# -eq 0 ] || [ -z "$1" ] || \
-      [ ! -f "$logMemStatsCFGfile" ] || \
+      [ ! -s "$logMemStatsCFGfile" ] || \
       ! grep -q "^${1}=" "$logMemStatsCFGfile"
    then echo "" ; return 1 ; fi
    local keyValue
@@ -491,18 +496,20 @@ _SetConfigurationOption_()
 #-----------------------------------------------------------------------#
 _InitConfigurationSettings_()
 {
-   [ ! -f "$logMemStatsCFGfile" ] && return 1
+   [ ! -s "$logMemStatsCFGfile" ] && return 1
    . "$logMemStatsCFGfile"
 
-   if [ "$maxLogFileSizeKB" -lt "$MIN_LogFileSizeKB" ] || \
+   if ! echo "$maxLogFileSizeKB" | grep -qE '^[1-9][0-9]+$' || \
+      [ "$maxLogFileSizeKB" -lt "$MIN_LogFileSizeKB" ] || \
       [ "$maxLogFileSizeKB" -gt "$MAX_LogFileSizeKB" ]
    then
        _SetConfigurationOption_ maxLogFileSizeKB "$DEF_LogFileSizeKB"
    fi
    userMaxLogFileSize="$((maxLogFileSizeKB * 1024))"
 
-   if [ "$isSendEmailNotificationsEnabled" != "true" ] && \
-      [ "$isSendEmailNotificationsEnabled" != "false" ]
+   if [ -z "${isSendEmailNotificationsEnabled:+xSETx}" ] || \
+      { [ "$isSendEmailNotificationsEnabled" != "true" ] && \
+        [ "$isSendEmailNotificationsEnabled" != "false" ] ; }
    then
        _SetConfigurationOption_ isSendEmailNotificationsEnabled false
    fi
@@ -526,28 +533,11 @@ _CheckConfigurationFile_()
 #-----------------------------------------------------------------------#
 cpuTemperatureCelsius=""
 cpuTempThresholdTestOnly=false
-readonly cpuThermalThresholdTestOnly=10
+readonly cpuThermalThresholdTestOnly=11
 readonly cpuThermalThresholdWarning1=88
 readonly cpuThermalThresholdRedAlert1=90
 readonly cpuThermalThresholdRedAlert2=92
 readonly cpuThermalThresholdRedAlert3=94
-
-#-----------------------------------------------------------------------#
-# JFFS Filesystem Percent Usage Thresholds
-# >> 85% Used = Red Alert Level 3 [6 hrs]
-# >> 80% Used = Red Alert Level 2 [12 hrs]
-# >> 75% Used = Red Alert Level 1 [24 hrs]
-# >> 70% Used = Yellow Warning Level 2 [36 hrs]
-# >> 65% Used = Yellow Warning Level 1 [48 hrs]
-# <= 65% Used = Green OK
-#-----------------------------------------------------------------------#
-jffsUsageThresholdTestOnly=false
-readonly jffsUsedThresholdTestOnly=1
-readonly jffsUsedThresholdWarning1=65
-readonly jffsUsedThresholdWarning2=70
-readonly jffsUsedThresholdRedAlert1=75
-readonly jffsUsedThresholdRedAlert2=80
-readonly jffsUsedThresholdRedAlert3=85
 
 #-----------------------------------------------------------------------#
 # NVRAM Percent Usage Thresholds
@@ -559,12 +549,29 @@ readonly jffsUsedThresholdRedAlert3=85
 # <= 90% Used = Green OK
 #-----------------------------------------------------------------------#
 nvramUsageThresholdTestOnly=false
-readonly nvramUsedThresholdTestOnly=33
+readonly nvramUsedThresholdTestOnly=22
 readonly nvramUsedThresholdWarning1=90
 readonly nvramUsedThresholdWarning2=93
 readonly nvramUsedThresholdRedAlert1=95
 readonly nvramUsedThresholdRedAlert2=96
 readonly nvramUsedThresholdRedAlert3=97
+
+#-----------------------------------------------------------------------#
+# JFFS Filesystem Percent Usage Thresholds
+# >> 85% Used = Red Alert Level 3 [6 hrs]
+# >> 80% Used = Red Alert Level 2 [12 hrs]
+# >> 75% Used = Red Alert Level 1 [24 hrs]
+# >> 72% Used = Yellow Warning Level 2 [36 hrs]
+# >> 70% Used = Yellow Warning Level 1 [48 hrs]
+# <= 70% Used = Green OK
+#-----------------------------------------------------------------------#
+jffsUsageThresholdTestOnly=false
+readonly jffsUsedThresholdTestOnly=1
+readonly jffsUsedThresholdWarning1=70
+readonly jffsUsedThresholdWarning2=72
+readonly jffsUsedThresholdRedAlert1=75
+readonly jffsUsedThresholdRedAlert2=80
+readonly jffsUsedThresholdRedAlert3=85
 
 #-----------------------------------------------------------------------#
 # "tmpfs" Filesystem Percent Usage Thresholds
@@ -1355,7 +1362,6 @@ _CheckUsageThresholds_NVRAM_()
        _NVRAM_ShowUsageNotification_ NVRAM_NOT_FOUND UNKNOWN UNKNOWN
        _NVRAM_MailUsageNotification_ NVRAM_NOT_FOUND UNKNOWN UNKNOWN
        return 0
-       printf "\n**ERROR**: NVRAM size info is NOT found.\n"
    fi
    usedx="$(echo "$nvramUsageStr" | awk -F ' ' '{print $2}')"
    freex="$(echo "$nvramUsageStr" | awk -F ' ' '{print $4}')"
@@ -1690,37 +1696,19 @@ _CPU_Temperature_()
 
 quietArg=""
 updateArg=""
-downloadHelper=false
 
 for PARAM in "$@"
 do
-   case $PARAM in
+   case "$PARAM" in
        "-verbose" | "-quiet" | "-veryquiet")
-           quietArg="$PARAM"
-           ;;
-       "-versionCheck")
-           updateArg="$PARAM"
-           ;;
-       "-download")
-          if [ $# -gt 1 ] && [ "$2" = "-cemdlhelper" ]
-          then downloadHelper=true ; fi
+          quietArg="$PARAM"
+          ;;
+       -versionCheck)
+          updateArg="$PARAM"
           ;;
        *) ;; #CONTINUE#
    esac
 done
-
-if "$downloadHelper" || [ ! -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
-then _DownloadCEMLibraryHelperFile_ ; fi
-
-if [ -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
-then
-    . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
-    _CheckForLibraryScript_CEM_ "$updateArg" "$quietArg"
-else
-    _PrintMsg_ "\n**ERROR**: Helper script file [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] *NOT* FOUND.\n"
-
-    [ -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] && . "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
-fi
 
 if [ "$updateArg" = "-versionCheck" ]
 then
@@ -1728,8 +1716,10 @@ then
     exit $?
 fi
 
-routerInfo=false
-routerMODEL_ID="$(_GetRouterModelID_)"
+modelInfo=false
+downloadHelper=false
+readonly routerMODEL_ID="$(_GetRouterModelID_)"
+readonly routerFWversion="$(_GetCurrentFWVersion_)"
 
 _CheckConfigurationFile_
 _ValidateLogDirPath_ "$userLogDirectoryPath" "$prefLogDirectoryPath" "$altLogDirectoryPath"
@@ -1738,13 +1728,15 @@ _CheckLogFileSize_
 if [ $# -gt 0 ] && [ -n "$1" ]
 then
     case "$1" in
-        -cputest) cpuTempThresholdTestOnly=true  ##TEST ONLY##
+        -model) modelInfo=true
            ;;
-        -jffstest) jffsUsageThresholdTestOnly=true  ##TEST ONLY##
+        -cputest) cpuTempThresholdTestOnly=true
            ;;
-        -tmpfstest) tmpfsUsageThresholdTestOnly=true  ##TEST ONLY##
+        -jffstest) jffsUsageThresholdTestOnly=true
            ;;
-        -nvramtest) nvramUsageThresholdTestOnly=true  ##TEST ONLY##
+        -tmpfstest) tmpfsUsageThresholdTestOnly=true
+           ;;
+        -nvramtest) nvramUsageThresholdTestOnly=true
            ;;
         -enableEmailNotification)
            _SetConfigurationOption_ isSendEmailNotificationsEnabled true
@@ -1752,22 +1744,37 @@ then
         -disableEmailNotification)
            _SetConfigurationOption_ isSendEmailNotificationsEnabled false
            ;;
-        -download)  ## VALID Parameter ##
-           ;;
-        -info)
-           routerInfo=true
-           routerFWversion="$(_GetCurrentFWVersion_)"
+        -download)
+           if [ $# -gt 1 ] && [ "$2" = "-cemdlhelper" ]
+           then downloadHelper=true ; fi
            ;;
         *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN Parameter [$1]\n\n"
            exit 1
+           ;;
     esac
+fi
+
+if "$isSendEmailNotificationsEnabled"
+then
+   if "$downloadHelper" || [ ! -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
+   then _DownloadCEMLibraryHelperFile_ ; fi
+
+   if [ -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
+   then
+       . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
+       _CheckForLibraryScript_CEM_ "$updateArg" "$quietArg"
+   else
+       _PrintMsg_ "\n**ERROR**: Helper script file [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] *NOT* FOUND.\n"
+
+       [ -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] && . "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
+   fi
 fi
 
 {
    echo "=================================="
    date +"%Y-%b-%d, %I:%M:%S %p %Z (%a)"
-   "$routerInfo" && \
-   printf "Router Model: ${routerMODEL_ID}\nF/W Installed: ${routerFWversion}\n\n"
+   "$modelInfo" && printf "Router Model: ${routerMODEL_ID}\n"
+   printf "F/W Installed: ${routerFWversion}\n\n"
    printf "Uptime\n------\n" ; uptime ; echo
    _CPU_Temperature_ ; echo
    printf "free:\n" ; free ; echo
