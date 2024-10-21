@@ -34,7 +34,10 @@ _TrimDatabase_()
    TZ="$(cat /etc/TZ)"
    export TZ
    timeNowSecs="$(date +'%s')"
-   printf "\n[$(date +"$logTimeFormat")] Trimming records older than [$daysToKeep] days from database.\n" | tee -a "$sqLiteDBlogFile"
+
+   printf "[$(date +"$logTimeFormat")] BEGIN.\n" >> "$sqLiteDBlogFile"
+   [ -s "$sqLiteDBaseFile" ] && ls -1l "$sqLiteDBaseFile" | tee -a "$sqLiteDBlogFile"
+   printf "[$(date +"$logTimeFormat")] Trimming records older than [$daysToKeep] days from database.\n" | tee -a "$sqLiteDBlogFile"
 
    {
      echo "PRAGMA cache_size=-20000;"
@@ -64,7 +67,9 @@ _TrimDatabase_()
 
    rm -f "$sqLiteDBcmdFile"
    "$foundError" && resultStr="reported error(s)." || resultStr="completed successfully."
-   printf "[$(date +"$logTimeFormat")] Database trim process ${resultStr}\n\n" | tee -a "$sqLiteDBlogFile"
+   printf "[$(date +"$logTimeFormat")] Database trim process ${resultStr}\n" | tee -a "$sqLiteDBlogFile"
+   [ -s "$sqLiteDBaseFile" ] && ls -1l "$sqLiteDBaseFile" | tee -a "$sqLiteDBlogFile"
+   printf "[$(date +"$logTimeFormat")] END.\n" >> "$sqLiteDBlogFile"
 }
 
 foundError=false
