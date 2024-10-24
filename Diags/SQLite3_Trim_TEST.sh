@@ -5,7 +5,7 @@
 # Last Modified: 2024-Oct-24 [Martinski W.]
 ###################################################################
 
-VERSION="0.1.5"
+VERSION="0.1.6"
 
 if true
 then readonly LOG_DIR_PATH="$HOME"
@@ -351,6 +351,11 @@ then
 fi
 
 trap 'exit 0' INT QUIT ABRT TERM
+
+TMPDIR="$OPT_USB_PATH"
+SQLITE_TMPDIR="$OPT_USB_PATH"
+export TMPDIR
+export SQLITE_TMPDIR
 
 "$getOldestRecs" && { _ShowOldestRecords_ ; exit 0 ; }
 _TrimDatabase_
