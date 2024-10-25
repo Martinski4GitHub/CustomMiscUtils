@@ -5,7 +5,7 @@
 # Last Modified: 2024-Oct-24 [Martinski W.]
 ###################################################################
 
-VERSION="0.1.6"
+VERSION="0.1.7"
 
 if true
 then readonly LOG_DIR_PATH="$HOME"
@@ -21,7 +21,6 @@ readonly logTimeFormat="%Y-%m-%d %H:%M:%S"
 readonly _1_0_GB_="1073741824"
 readonly _1_5_GB_="1610612736"
 readonly _2_0_GB_="2147483648"
-readonly maxTrimSize="$_2_0_GB_"
 
 _DaysToKeep_() { echo "$daysToKeepData" ; }
 
@@ -157,7 +156,7 @@ _ShowOldestRecords_()
 
    if "$showBookends"
    then
-      printf "[$(date +"$logTimeFormat")] BEGIN.\n" >> "$sqLiteDBoldFile"
+      printf "[$(date +"$logTimeFormat")] BEGIN [v${VERSION}].\n" >> "$sqLiteDBoldFile"
       _ShowSQLDBfileInfo_ "$sqLiteDBaseFile" | tee -a "$sqLiteDBoldFile"
    fi
    printf "[$(date +"$logTimeFormat")] Get records older than [$daysToKeepData] days from database.\n" | tee -a "$sqLiteDBoldFile"
@@ -229,7 +228,7 @@ _TrimDatabase_()
    TZ="$(cat /etc/TZ)"
    export TZ
 
-   printf "[$(date +"$logTimeFormat")] BEGIN.\n" >> "$sqLiteDBLOGFile"
+   printf "[$(date +"$logTimeFormat")] BEGIN [v${VERSION}].\n" >> "$sqLiteDBLOGFile"
    _ShowSQLDBfileInfo_ "$sqLiteDBaseFile" | tee -a "$sqLiteDBLOGFile"
    printf "[$(date +"$logTimeFormat")] Trimming records older than [$daysToKeepData] days from database.\n" | tee -a "$sqLiteDBLOGFile"
    echo "----------------------------------------------------------" >> "$sqLiteDBLOGFile"
@@ -244,8 +243,7 @@ _TrimDatabase_()
 
    [ -s "$sqLiteDBaseFile" ] && \
    dbFileSize="$(ls -1l "$sqLiteDBaseFile" | awk -F ' ' '{print $3}')"
-   if [ "$dbFileSize" -ge "$maxTrimSize" ]
-   then vacuumOK=false ; cacheSize=10 ; fi
+   #### [ "$dbFileSize" -ge "$_2_0_GB_" ] && vacuumOK=false
    timeNowSecs="$(date +'%s')"
    _SetSQLDBcmdsFile_
    trap '' HUP
@@ -354,8 +352,7 @@ trap 'exit 0' INT QUIT ABRT TERM
 
 TMPDIR="$OPT_USB_PATH"
 SQLITE_TMPDIR="$OPT_USB_PATH"
-export TMPDIR
-export SQLITE_TMPDIR
+export TMPDIR SQLITE_TMPDIR
 
 "$getOldestRecs" && { _ShowOldestRecords_ ; exit 0 ; }
 _TrimDatabase_
