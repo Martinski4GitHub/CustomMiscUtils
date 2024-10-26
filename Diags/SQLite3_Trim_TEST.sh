@@ -2,10 +2,10 @@
 ###################################################################
 # SQLite3_Trim_TEST.sh
 # Creation Date: 2024-Oct-20 [Martinski W.]
-# Last Modified: 2024-Oct-24 [Martinski W.]
+# Last Modified: 2024-Oct-25 [Martinski W.]
 ###################################################################
 
-VERSION="0.1.7"
+VERSION="0.1.8"
 
 if true
 then readonly LOG_DIR_PATH="$HOME"
@@ -54,6 +54,12 @@ _ShowMemInfo_()
    echo "-------------------------------------------"
 }
 
+_ShowSQLDBcmdsFile_()
+{
+  cat "$sqLiteDBCMDFile"
+  echo "=========================================================="
+}
+
 _SetSQLDBcmdsFile_()
 {
    {
@@ -63,17 +69,11 @@ _SetSQLDBcmdsFile_()
      echo "BEGIN TRANSACTION;"
      echo "DELETE FROM [dnsqueries] WHERE [Timestamp] < strftime('%s',datetime($timeNowSecs,'unixepoch','-$(_DaysToKeep_) day'));"
      echo "DELETE FROM [dnsqueries] WHERE [Timestamp] > $timeNowSecs;"
-     "$doSrceFrom" && echo "DELETE FROM [dnsqueries] WHERE [SrcIP] = 'from';"
+     echo "DELETE FROM [dnsqueries] WHERE [SrcIP] = 'from';"
      echo "ANALYZE dnsqueries;"
      echo "END TRANSACTION;"
      "$vacuumOK" && echo "VACUUM;"
    } > "$sqLiteDBCMDFile"
-}
-
-_ShowSQLDBcmdsFile_()
-{
-  cat "$sqLiteDBCMDFile"
-  echo "=========================================================="
 }
 
 _SetSQLDBcmdsOldest_()
@@ -83,6 +83,7 @@ _SetSQLDBcmdsOldest_()
      echo ".headers off"
      echo ".separator '|'"
      echo ".output $sqLiteDBTMPFile"
+     echo "PRAGMA temp_store=1;"
      printf "SELECT * FROM [dnsqueries] WHERE [Timestamp] < strftime('%%s',datetime($timeNowSecs,'unixepoch','-$(_DaysToKeep_) day')) "
      printf "ORDER BY [Timestamp] ASC LIMIT %d;\n" "$recordsLimit"
    } > "$sqLiteDBCMDFile"
@@ -100,7 +101,6 @@ _SQLiteShowTimeStamp_()
       printf "TimeStamp: %s\n" "$(date -d @$timeStamp +'%Y-%b-%d %I:%M:%S %p %Z (%a)')"
    }
 
-   dos2unix "$1"
    recordNum=0
    lastRecordNum="$(cat "$1" | wc -l)"
    numDigits="$(echo "$lastRecordNum" | wc -m)"
@@ -156,7 +156,7 @@ _ShowOldestRecords_()
 
    if "$showBookends"
    then
-      printf "[$(date +"$logTimeFormat")] BEGIN [v${VERSION}].\n" >> "$sqLiteDBoldFile"
+      printf "[$(date +"$logTimeFormat")] BEGIN [v${VERSION}]\n" >> "$sqLiteDBoldFile"
       _ShowSQLDBfileInfo_ "$sqLiteDBaseFile" | tee -a "$sqLiteDBoldFile"
    fi
    printf "[$(date +"$logTimeFormat")] Get records older than [$daysToKeepData] days from database.\n" | tee -a "$sqLiteDBoldFile"
@@ -184,6 +184,7 @@ _ShowOldestRecords_()
       if [ -s "$sqLiteDBTMPFile" ]
       then
          oldestRecsFound=true
+         dos2unix "$sqLiteDBTMPFile" 2>&1 | tee -a "$sqLiteDBoldFile"
          _SQLiteShowTimeStamp_ "$sqLiteDBTMPFile" | tee -a "$sqLiteDBoldFile"
       else
          oldestRecsFound=false
@@ -192,7 +193,8 @@ _ShowOldestRecords_()
       fi
    fi
    "$testDebug" && _ShowSQLDBcmdsFile_ >> "$sqLiteDBoldFile"
-   ! "$testDebug" && rm -f "$sqLiteDBCMDFile" "$sqLiteDBTMPFile"
+   ! "$testDebug" && rm -f "$sqLiteDBCMDFile"
+   rm -f "$sqLiteDBTMPFile"
 
    if "$showBookends"
    then
@@ -228,7 +230,7 @@ _TrimDatabase_()
    TZ="$(cat /etc/TZ)"
    export TZ
 
-   printf "[$(date +"$logTimeFormat")] BEGIN [v${VERSION}].\n" >> "$sqLiteDBLOGFile"
+   printf "[$(date +"$logTimeFormat")] BEGIN [v${VERSION}]\n" >> "$sqLiteDBLOGFile"
    _ShowSQLDBfileInfo_ "$sqLiteDBaseFile" | tee -a "$sqLiteDBLOGFile"
    printf "[$(date +"$logTimeFormat")] Trimming records older than [$daysToKeepData] days from database.\n" | tee -a "$sqLiteDBLOGFile"
    echo "----------------------------------------------------------" >> "$sqLiteDBLOGFile"
@@ -243,7 +245,6 @@ _TrimDatabase_()
 
    [ -s "$sqLiteDBaseFile" ] && \
    dbFileSize="$(ls -1l "$sqLiteDBaseFile" | awk -F ' ' '{print $3}')"
-   #### [ "$dbFileSize" -ge "$_2_0_GB_" ] && vacuumOK=false
    timeNowSecs="$(date +'%s')"
    _SetSQLDBcmdsFile_
    trap '' HUP
@@ -309,13 +310,11 @@ testDebug=false
 vacuumOK=true
 cacheSize=20
 limitSize=2000
-doSrceFrom=true
-getOldestRecs=false
-oldestRecsFound=false
 recordsLimit=10
 showTotalOnly=false
+getOldestRecs=false
+oldestRecsFound=false
 daysToKeepData=30
-paramsError=false
 
 if [ $# -eq 0 ] || [ -z "$1" ]
 then
@@ -325,10 +324,9 @@ else
    for PARAM in "$@"
    do
       case "$PARAM" in
-          "cache") cacheSize=10 ;;
-          "novac") vacuumOK=false ;;
-          "total") showTotalOnly=true
-                   recordsLimit=-1 ;;
+          "total") recordsLimit=-1
+                   getOldestRecs=true
+                   showTotalOnly=true ;;
          "oldest") getOldestRecs=true ;;
                 *) if echo "$PARAM" | grep -qE "^([0-9][0-9]{0,2})$"
                    then
@@ -351,8 +349,8 @@ fi
 trap 'exit 0' INT QUIT ABRT TERM
 
 TMPDIR="$OPT_USB_PATH"
-SQLITE_TMPDIR="$OPT_USB_PATH"
-export TMPDIR SQLITE_TMPDIR
+SQLITE_TMPDIR="$TMPDIR"
+export SQLITE_TMPDIR TMPDIR
 
 "$getOldestRecs" && { _ShowOldestRecords_ ; exit 0 ; }
 _TrimDatabase_
