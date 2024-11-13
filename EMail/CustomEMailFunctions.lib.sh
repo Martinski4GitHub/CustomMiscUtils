@@ -7,7 +7,7 @@
 # email notifications using AMTM email configuration file.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Jul-17 [Martinski W.]
+# Last Modified: 2024-Nov-13 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -15,7 +15,7 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="0.9.22"
+CEM_LIB_VERSION="0.9.23"
 CEM_TXT_VERFILE="cemVersion.txt"
 
 CEM_LIB_REPO_BRANCH="master"
@@ -72,7 +72,11 @@ PASSWORD=""  emailPwEnc=""
 # Custom Additions ##
 CC_NAME=""  CC_ADDRESS=""
 
-[ -f "$amtmEMailConfFile" ] && . "$amtmEMailConfFile"
+if [ -s "$amtmEMailConfFile" ]
+then
+   dos2unix "$amtmEMailConfFile"
+   . "$amtmEMailConfFile"
+fi
 
 #-----------------------------------------------------------#
 _DoReInit_CEM_()
@@ -217,7 +221,7 @@ CheckEMailConfigFileFromAMTM_CEM_()
 {
    amtmIsEMailConfigFileEnabled=false
 
-   if [ ! -f "$amtmEMailConfFile" ]
+   if [ ! -s "$amtmEMailConfFile" ]
    then
        _PrintMsg_CEM_ "\n**ERROR**: Unable to send email notifications."
        _PrintMsg_CEM_ "\nAMTM email configuration file is not yet set up.\n"
@@ -241,6 +245,7 @@ CheckEMailConfigFileFromAMTM_CEM_()
        return 1
    fi
 
+   chmod 640 "$amtmEMailConfFile" "$amtmEMailPswdFile"
    amtmIsEMailConfigFileEnabled=true
    return 0
 }
