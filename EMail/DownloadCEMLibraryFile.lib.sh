@@ -13,7 +13,7 @@
 # but do *NOT* change the variable names.
 #
 # Creation Date: 2024-Jul-08 [Martinski W.]
-# Last Modified: 2024-Aug-03 [Martinski W.]
+# Last Modified: 2024-Nov-13 [Martinski W.]
 ####################################################################
 
 if [ -z "${_LIB_DownloadCEMLibraryFile_SHELL_:+xSETx}" ]
@@ -21,7 +21,7 @@ then _LIB_DownloadCEMLibraryFile_SHELL_=0
 else return 0
 fi
 
-CEM_DL_HELPER_VERSION="0.1.9"
+CEM_DL_HELPER_VERSION="0.1.10"
 
 CEM_LIB_BRANCH="master"
 CEM_LIB_URL2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/${CEM_LIB_BRANCH}/EMail"
@@ -67,6 +67,7 @@ _DownloadLibraryScript_CEM_()
           return 1
       else
           mv -f "$libScriptFileDL" "$CEM_LIB_FILE_PATH"
+          dos2unix "$CEM_LIB_FILE_PATH"
           chmod 755 "$CEM_LIB_FILE_PATH"
           . "$CEM_LIB_FILE_PATH"
           if "$cemIsVerboseMode" || { [ "$2" -gt 1 ] && "$doDL_ShowErrorMsgs" ; }
