@@ -7,7 +7,7 @@
 # email notifications using AMTM email configuration file.
 #
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2024-Nov-13 [Martinski W.]
+# Last Modified: 2025-Jan-02 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -15,7 +15,7 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="0.9.23"
+CEM_LIB_VERSION="0.9.24"
 CEM_TXT_VERFILE="cemVersion.txt"
 
 CEM_LIB_REPO_BRANCH="master"
@@ -48,9 +48,9 @@ cemSysLogger="$(which logger)"
 cemLogInfoTag="INFO_${cemScriptFileName}_$$"
 cemLogErrorTag="ERROR_${cemScriptFileName}_$$"
 
-amtmEMailDirPath="/jffs/addons/amtm/mail"
-amtmEMailConfFile="${amtmEMailDirPath}/email.conf"
-amtmEMailPswdFile="${amtmEMailDirPath}/emailpw.enc"
+amtmEMailDirPathCEM="/jffs/addons/amtm/mail"
+amtmEMailConfFileCEM="${amtmEMailDirPathCEM}/email.conf"
+amtmEMailPswdFileCEM="${amtmEMailDirPathCEM}/emailpw.enc"
 
 amtmIsEMailConfigFileEnabled=false
 cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
@@ -71,12 +71,6 @@ PASSWORD=""  emailPwEnc=""
 
 # Custom Additions ##
 CC_NAME=""  CC_ADDRESS=""
-
-if [ -s "$amtmEMailConfFile" ]
-then
-   dos2unix "$amtmEMailConfFile"
-   . "$amtmEMailConfFile"
-fi
 
 #-----------------------------------------------------------#
 _DoReInit_CEM_()
@@ -99,6 +93,15 @@ _LogMsg_CEM_()
    printf "${1}: ${2}\n"
 
    "$cemDoSystemLog" && $cemSysLogger -t "$1" "$2"
+}
+
+#-----------------------------------------------------------#
+_DOStoUNIX_()
+{
+   if [ $# -eq 0 ] || [ -z "$1" ] || [ ! -s "$1" ]
+   then return 1 ; fi
+   if grep -q "$(printf '\r\n')" "$1" 2>/dev/null
+   then dos2unix "$1" ; fi
 }
 
 #-----------------------------------------------------------#
@@ -217,18 +220,18 @@ _GetRouterModelID_CEM_()
 }
 
 #-----------------------------------------------------------#
-CheckEMailConfigFileFromAMTM_CEM_()
+_CheckEMailConfigFileFromAMTM_CEM_()
 {
    amtmIsEMailConfigFileEnabled=false
 
-   if [ ! -s "$amtmEMailConfFile" ]
+   if [ ! -s "$amtmEMailConfFileCEM" ]
    then
        _PrintMsg_CEM_ "\n**ERROR**: Unable to send email notifications."
        _PrintMsg_CEM_ "\nAMTM email configuration file is not yet set up.\n"
        return 1
    fi
 
-   if [ ! -s "$amtmEMailPswdFile" ] || [ -z "$emailPwEnc" ] || \
+   if [ ! -s "$amtmEMailPswdFileCEM" ] || [ -z "$emailPwEnc" ] || \
       [ "$PASSWORD" = "PUT YOUR PASSWORD HERE" ]
    then
        _PrintMsg_CEM_ "\n**ERROR**: Unable to send email notifications."
@@ -245,7 +248,7 @@ CheckEMailConfigFileFromAMTM_CEM_()
        return 1
    fi
 
-   chmod 640 "$amtmEMailConfFile" "$amtmEMailPswdFile"
+   chmod 640 "$amtmEMailConfFileCEM" "$amtmEMailPswdFileCEM"
    amtmIsEMailConfigFileEnabled=true
    return 0
 }
@@ -365,10 +368,10 @@ EOF
 _SendEMailNotification_CEM_()
 {
    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] || \
-      ! CheckEMailConfigFileFromAMTM_CEM_
+      ! _CheckEMailConfigFileFromAMTM_CEM_
    then return 1 ; fi
 
-   local logTag  logMsg  curlCode
+   local logTag  logMsg  curlCode  mailpwd
    local CC_ADDRESS_STR=""  CC_ADDRESS_ARG=""
 
    [ -z "$FROM_NAME" ] && FROM_NAME="$cemScriptFNameTag"
@@ -384,10 +387,10 @@ _SendEMailNotification_CEM_()
 
    date +"$cemDateTimeFormat" > "$cemTempEMailLogFile"
 
+   mailpwd="$(/usr/sbin/openssl aes-256-cbc "$emailPwEnc" -d -in "$amtmEMailPswdFileCEM" -pass pass:ditbabot,isoi)"
    /usr/sbin/curl -v --retry 4 --retry-delay 5 --url "${PROTOCOL}://${SMTP}:${PORT}" \
    --mail-from "$FROM_ADDRESS" --mail-rcpt "$TO_ADDRESS" $CC_ADDRESS_ARG \
-   --user "${USERNAME}:$(/usr/sbin/openssl aes-256-cbc "$emailPwEnc" -d -in "$amtmEMailPswdFile" -pass pass:ditbabot,isoi)" \
-   --upload-file "$cemTempEMailContent" \
+   --user "${USERNAME}:$mailpwd" --upload-file "$cemTempEMailContent" \
    $SSL_FLAG --ssl-reqd --crlf >> "$cemTempEMailLogFile" 2>&1
    curlCode="$?"
 
@@ -412,6 +415,13 @@ _SendEMailNotification_CEM_()
 
    return "$curlCode"
 }
+
+if [ -s "$amtmEMailConfFileCEM" ]
+then
+    chmod 640 "$amtmEMailConfFileCEM"
+    _DOStoUNIX_ "$amtmEMailConfFileCEM"
+    . "$amtmEMailConfFileCEM"
+fi
 
 _LIB_CustomEMailFunctions_SHELL_=1
 
