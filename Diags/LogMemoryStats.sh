@@ -47,11 +47,11 @@
 # cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2024-Sep-28 [Martinski W.]
+# Last Modified: 2025-Feb-14 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.9"
+readonly LMS_VERSION="0.7.10"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -102,6 +102,9 @@ readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME="DownloadCEMLibraryFile.lib.sh"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/master/EMail"
+
+# Give priority to built-in binaries #
+export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
 
 scriptLogFPath="${userLogDirectoryPath}/$scriptLogFName"
 backupLogFPath="${userLogDirectoryPath}/$backupLogFName"
