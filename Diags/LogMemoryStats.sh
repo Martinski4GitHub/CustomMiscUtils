@@ -39,19 +39,19 @@
 # FOR DIAGNOSTICS PURPOSES:
 # -------------------------
 # Set up a cron job to periodically monitor and log RAM usage
-# stats every 3 to 6 hours to check for any "trends" in unusual
+# stats every 2 to 6 hours to check for any "trends" in unusual
 # increases in RAM usage, especially if unexpected large files
 # are being created/stored in "tmpfs" (or "jffs") filesystem.
 #
 # EXAMPLE:
-# cru a LogMemStats "0 */4 * * * /jffs/scripts/LogMemoryStats.sh"
+# cru a LogMemStats "0 */2 * * * /jffs/scripts/LogMemoryStats.sh"
 #--------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2025-Feb-14 [Martinski W.]
+# Last Modified: 2025-Feb-16 [Martinski W.]
 #####################################################################
 set -u
 
-readonly LMS_VERSION="0.7.10"
+readonly LMS_VERSION="0.7.11"
 readonly LMS_VERFILE="lmsVersion.txt"
 
 readonly LMS_SCRIPT_TAG="master"
@@ -131,7 +131,7 @@ _WaitForEnterKey_()
 {
    ! "$isInteractive" && return 0
    printf "\nPress <Enter> key to continue..."
-   read -r EnterKEY ; echo
+   read -rs EnterKEY ; echo
 }
 
 #-----------------------------------------------------------#
@@ -1719,7 +1719,8 @@ then
     exit $?
 fi
 
-modelInfo=false
+numVal=0
+numProcs=10
 downloadHelper=false
 readonly routerMODEL_ID="$(_GetRouterModelID_)"
 readonly routerFWversion="$(_GetCurrentFWVersion_)"
@@ -1731,7 +1732,15 @@ _CheckLogFileSize_
 if [ $# -gt 0 ] && [ -n "$1" ]
 then
     case "$1" in
-        -model) modelInfo=true
+        -numprocs=[0-9]*)
+           numVal="${1##*=}"
+           if echo "$numVal" | grep -qE "^[1-9][0-9]{1,2}$"
+           then
+               numProcs="$numVal"
+           else
+               _PrintMsg_ "\n\n*ERROR**: INVALID parameter value [$numVal]\n\n"
+               exit 1
+           fi
            ;;
         -cputest) cpuTempThresholdTestOnly=true
            ;;
@@ -1751,7 +1760,7 @@ then
            if [ $# -gt 1 ] && [ "$2" = "-cemdlhelper" ]
            then downloadHelper=true ; fi
            ;;
-        *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN Parameter [$1]\n\n"
+        *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN parameter [$1]\n\n"
            exit 1
            ;;
     esac
@@ -1776,7 +1785,7 @@ fi
 {
    echo "=================================="
    date +"%Y-%b-%d, %I:%M:%S %p %Z (%a)"
-   "$modelInfo" && printf "Router Model: ${routerMODEL_ID}\n"
+   printf "Router Model: ${routerMODEL_ID}\n"
    printf "F/W Installed: ${routerFWversion}\n\n"
    printf "Uptime\n------\n" ; uptime ; echo
    _CPU_Temperature_ ; echo
@@ -1807,7 +1816,7 @@ fi
              ;;
    esac
    echo
-   top -b -n1 | head -n 14
+   top -b -n1 | head -n "$((numProcs + 4))"
 } > "$tempLogFPath"
 
 _CheckUsageThresholds_JFFS_
