@@ -4,6 +4,8 @@
 # Last Modified: 2025-Jul-29 [Martinski W.]
 #----------------------------------------------------------
 set -u
+readonly VERSION="0.5.1"
+readonly VERSTAG=25072920
 
 _GetDebugDataNTPMerlin_()
 {
@@ -22,14 +24,20 @@ _GetDebugDataNTPMerlin_()
    if [ -f /opt/etc/init.d/S77ntpd ]
    then
        echo "-----------------------------------"
-       printf "Check ntpd:\n-----------\n"
+       printf "NTPD:\n-----\n"
+       cat /opt/etc/init.d/S77ntpd
+       echo "-----------------------------------"
+       printf "Check NTPD:\n-----------\n"
        /opt/etc/init.d/S77ntpd check ; echo
        top -b -n 1 | grep -E "ntpd|timeserverd" | grep -v grep
    fi
    if [ -f /opt/etc/init.d/S77chronyd ]
    then
        echo "-----------------------------------"
-       printf "Check chronyd:\n--------------\n"
+       printf "CHRONYD:\n--------\n"
+       cat /opt/etc/init.d/S77chronyd
+       echo "-----------------------------------"
+       printf "Check CHRONYD:\n--------------\n"
        /opt/etc/init.d/S77chronyd check ; echo
        ls -l /opt/etc/passwd ; echo
        top -b -n 1 | grep -E "chronyd|timeserverd" | grep -v grep
