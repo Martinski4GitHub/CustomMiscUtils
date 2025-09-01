@@ -10,10 +10,12 @@
 # section.
 #
 # Creation Date: 2021-Jan-24 [Martinski W.]
-# Last Modified: 2024-Apr-10 [Martinski W.]
-# Version: 0.7.12
+# Last Modified: 2024-Dec-19 [Martinski W.]
 ######################################################################
 set -u
+
+readonly ScriptVERSION="0.7.14"
+readonly version_TAG="Version: $ScriptVERSION"
 
 ScriptFolder="$(/usr/bin/dirname "$0")"
 if [ "$ScriptFolder" = "." ]
@@ -46,11 +48,13 @@ readonly SCRIPT_NVRAM_BACKUP_CONFIG="${ScriptFolder}/$NVRAM_VarsBackupCFGname"
 readonly nvramBackupCFGCommentLine="## DO *NOT* EDIT THIS FILE BELOW THIS LINE. IT'S DYNAMICALLY UPDATED ##"
 readonly Line0SEP="========================================================================="
 
-readonly NOct="\033[0m"
-readonly BOLDtext="\033[1m"
-readonly DarkRED="\033[0;31m"
-readonly LghtGREEN="\033[1;32m"
-readonly LghtYELLOW="\033[1;33m"
+readonly NOct="\e[0m"
+readonly BOLDtext="\e[1m"
+readonly DarkRED="\e[0;31m"
+readonly LghtGREEN="\e[1;32m"
+readonly LghtYELLOW="\e[1;33m"
+readonly InvREDct="\e[41m"
+readonly InvBYLWct="\e[30;103m"
 readonly REDct="${DarkRED}${BOLDtext}"
 readonly GRNct="${LghtGREEN}${BOLDtext}"
 readonly YLWct="${LghtYELLOW}${BOLDtext}"
@@ -79,8 +83,8 @@ JFFS_BackupFPath=""
 JFFS_SubDirFilesMatch=""
 JFFS_BackupFilesMatch=""
 JFFS_OPVPN_BackedUp=false
-JFFS_ICONS_BackedUp=false
 JFFS_OPVPN_Restored=false
+JFFS_ICONS_BackedUp=false
 JFFS_ICONS_Restored=false
 
 backupsFound=false
@@ -228,7 +232,7 @@ _PrintMsg1_()
 _PrintError_()
 {
    "$isInteractive" && \
-   printf "\n${REDct}**ERROR**${NOct}: ${1}\n"
+   printf "\n${InvREDct}**ERROR**${NOct}: ${1}\n"
 }
 
 #------------------------------------------------------------------#
@@ -421,7 +425,7 @@ _NVRAM_ValidateUserBackupDirectory_()
    if "$isInteractive"
    then
       printf "${errorMsg}: "
-      printf "Backup directory [${REDct}${nvramVarsUserBackupDir}${NOct}] NOT FOUND."
+      printf "Backup directory [${InvREDct} ${nvramVarsUserBackupDir} ${NOct}] NOT FOUND."
       printf "\nTrying again with directory [$1]\n"
    fi
 
@@ -463,7 +467,7 @@ _NVRAM_GetCustomBackupConfigVars_()
    mkdir -m 755 "$nvramVarsUserBackupDir" 2>/dev/null
    if [ ! -d "$nvramVarsUserBackupDir" ]
    then
-       _PrintError_ "Backup directory [${REDct}${nvramVarsUserBackupDir}${NOct}] NOT FOUND."
+       _PrintError_ "Backup directory [${InvREDct} ${nvramVarsUserBackupDir} ${NOct}] NOT FOUND."
        _WaitForEnterKey_
        return 1
    fi
@@ -472,7 +476,7 @@ _NVRAM_GetCustomBackupConfigVars_()
       [ ! -f "$nvramVarsListFilePath" ]     || \
       [ ! -s "$nvramVarsListFilePath" ]
    then
-       _PrintError_ "NVRAM variable list file [${REDct}${nvramVarsListFilePath}${NOct}] is EMPTY or NOT FOUND."
+       _PrintError_ "NVRAM variable list file [${InvREDct} ${nvramVarsListFilePath} ${NOct}] is EMPTY or NOT FOUND."
        _WaitForEnterKey_
        return 1
    fi
@@ -700,7 +704,7 @@ _NVRAM_VarSaveKeyValue_()
        return 0
    fi
 
-   _PrintError_ "NVRAM variable key name \"${REDct}${NVRAM_VarKeyName}${NOct}\" *NOT* FOUND."
+   _PrintWarning_ "NVRAM variable key name \"${InvBYLWct}${NVRAM_VarKeyName}${NOct}\" *NOT* FOUND."
    return 1
 }
 
@@ -854,25 +858,26 @@ _NVRAM_GetKeyNamesFromRegExp_()
 
    if echo "$1" | grep -qE "^\*|^\.\*"
    then
-       _PrintError_ "NVRAM variable key names Regular Expression \"${REDct}${1}${NOct}\" is INVALID."
+       _PrintError_ "NVRAM variable key names Regular Expression \"${InvREDct}${1}${NOct}\" is INVALID."
        return 1
    fi
    if ! grep -qE "^${1}=" "$NVRAM_TempShowVarFle"
    then
-       _PrintError_ "NVRAM variable key names NOT FOUND using \"${REDct}${1}${NOct}\" Regular Expression."
+       _PrintWarning_ "NVRAM variable key names NOT FOUND using \"${InvBYLWct}${1}${NOct}\" Regular Expression."
        return 1
    fi
    local theKeyNameStr  lastKeyNameStr="X"
 
    while read -r theVarKeyEntry
    do
-      theKeyNameStr="$(echo "$theVarKeyEntry" | awk -F '=' '{print $1}')"
-      if [ -z "$theKeyNameStr" ] || ! _NVRAM_VarSetKeyInfo_ "$theKeyNameStr"
-      then continue ; fi
-
-      if _NVRAM_VarSaveKeyValue_ && [ "$theKeyNameStr" != "$lastKeyNameStr" ]
-      then nvramVarOKCount="$((nvramVarOKCount + 1))" ; fi
-      lastKeyNameStr="$theKeyNameStr"
+       theKeyNameStr="$(echo "$theVarKeyEntry" | awk -F '=' '{print $1}')"
+       if [ -z "$theKeyNameStr" ] || ! _NVRAM_VarSetKeyInfo_ "$theKeyNameStr"
+       then continue
+       fi
+       if _NVRAM_VarSaveKeyValue_ && [ "$theKeyNameStr" != "$lastKeyNameStr" ]
+       then nvramVarOKCount="$((nvramVarOKCount + 1))"
+       fi
+       lastKeyNameStr="$theKeyNameStr"
    done <<EOT
 $(grep -E "^${1}=" "$NVRAM_TempShowVarFle" | sort -d -t '=' -k 1)
 EOT
@@ -883,17 +888,32 @@ _SaveVarsFromUserList_()
 {
    if [ ! -s "$nvramVarsListFilePath" ]
    then
-       _PrintError_ "NVRAM variable list file [${REDct}${nvramVarsListFilePath}${NOct}] is EMPTY or NOT FOUND."
+       _PrintError_ "NVRAM variable list file [${InvREDct} ${nvramVarsListFilePath} ${NOct}] is EMPTY or NOT FOUND."
+       _WaitForEnterKey_
        return 1
    fi
+
+   local strnKeyNamesOnlyTag="[Key Names]"
+   local grepKeyNamesOnlyTag="\[Key Names\]"
+   local strnKeyNamesRegExTag="[Key Names: RegEx]"
+   local grepKeyNamesRegExTag="\[Key Names: RegEx\]"
+
+   if ! grep -qE "^(${grepKeyNamesOnlyTag}|${grepKeyNamesRegExTag})$" "$nvramVarsListFilePath"
+   then
+       _PrintError_ "NVRAM variable list file [${InvREDct} ${nvramVarsListFilePath} ${NOct}] does NOT include the required tags."
+       _PrintMsg0_ "\nRequired tags: ${GRNct}${strnKeyNamesOnlyTag}${NOct} and ${GRNct}${strnKeyNamesRegExTag}${NOct}\n"
+       _WaitForEnterKey_
+       return 1
+   fi
+
    local inputLineNumStr  inputListCount  nvramVarOKCount  nvramKeyNameStr
    local nvramKeyNameMode=false  nvramKeyRegExpMode=false  retCode=1
 
    _PrintMsg0_ "\nGetting list of NVRAM variable key names from:\n[${GRNct}${nvramVarsListFilePath}${NOct}]"
    _PrintMsg0_ "\nPlease wait...\n"
-   _PrintMsg0_ "\n${Line0SEP}"
+   _PrintMsg0_ "\n${Line0SEP}\n"
 
-   ! "$isVerbose" && _PrintMsg0_ "\nStart backup process.\n"
+   ! "$isVerbose" && _PrintMsg0_ "Start backup process.\n"
 
    _NVRAM_CleanupTempFiles_ -ALL
 
@@ -911,13 +931,13 @@ _SaveVarsFromUserList_()
       if [ -z "$theINPUTstr" ] || echo "$theINPUTstr" | grep -qE "^#"
       then continue ; fi
 
-      if echo "$theINPUTstr" | grep -qE "^\[Key Names\]$"
+      if echo "$theINPUTstr" | grep -qE "^${grepKeyNamesOnlyTag}$"
       then
           nvramKeyNameMode=true
           nvramKeyRegExpMode=false
           continue
       fi
-      if echo "$theINPUTstr" | grep -qE "^\[Key Names: RegEx\]$"
+      if echo "$theINPUTstr" | grep -qE "^${grepKeyNamesRegExTag}$"
       then
           nvramKeyNameMode=false
           nvramKeyRegExpMode=true
@@ -932,10 +952,11 @@ _SaveVarsFromUserList_()
       if "$nvramKeyNameMode"
       then
           if ! _NVRAM_VarSetKeyInfo_ "$nvramKeyNameStr"
-          then continue ; fi
-
+          then continue
+          fi
           if _NVRAM_VarSaveKeyValue_
-          then nvramVarOKCount="$((nvramVarOKCount + 1))" ; fi
+          then nvramVarOKCount="$((nvramVarOKCount + 1))"
+          fi
       #
       elif "$nvramKeyRegExpMode"
       then
@@ -953,8 +974,10 @@ _SaveVarsFromUserList_()
        _SaveAllVarsToBackup_
        retCode="$?"
    fi
+   if [ "$inputListCount" -gt 0 ]
+   then _PrintMsg0_ "${Line0SEP}\n"
+   fi
 
-   _PrintMsg0_ "${Line0SEP}\n"
    _PrintMsg0_ "Number of NVRAM variable key entries: [$inputListCount]\n"
    _PrintMsg0_ "Number of NVRAM variables backed up: [$nvramVarOKCount]\n"
 
@@ -978,10 +1001,10 @@ _GetFileSelectionIndex_()
    if [ $# -lt 2 ] || [ "$2" != "-MULTIOK" ]
    then
        multiIndexListOK=false
-       promptStr="Enter selection:[${selectStr}] [${theExitStr}]?"
+       promptStr="[${theExitStr}]\nEnter selection:[${selectStr}]?"
    else
        multiIndexListOK=true
-       promptStr="Enter selection:[${selectStr} | ${theAllStr}] [${theExitStr}]?"
+       promptStr="[${theExitStr}]\nEnter selection:[${selectStr} | ${theAllStr}]?"
    fi
    fileIndex=0  multiIndex=false
    numRegExp="([1-9]|[1-9][0-9])"
@@ -1094,7 +1117,7 @@ _NVRAM_VarRestoreKeysFromBackup_()
    tempFileCount="$(_list2_ -1 "$NVRAM_TempFilesMatch" 2>/dev/null | wc -l)"
    if [ ! -d "$NVRAM_TempDIRpath" ] || [ "$tempFileCount" -eq 0 ]
    then
-       _PrintError_ "Backup file(s) in [${REDct}${NVRAM_TempDIRpath}${NOct}] NOT FOUND."
+       _PrintError_ "Backup file(s) in [${InvREDct} ${NVRAM_TempDIRpath} ${NOct}] NOT FOUND."
        return 1
    fi
    local retCode=1  tempFileName  theKeyNameStr  NVRAM_VarFoundOK
@@ -1132,7 +1155,7 @@ _RestoreVarsFromBackup_()
    if ! _CheckForBackupFiles_
    then
        _NVRAM_UpdateCustomBackupConfig_ RESTD NONE STATUSupdate
-       _PrintError_ "Backup file(s) [${REDct}${nvramBackupFilesMatch}${NOct}] NOT FOUND."
+       _PrintError_ "Backup file(s) [${InvREDct} ${nvramBackupFilesMatch} ${NOct}] NOT FOUND."
        return 1
    fi
    _NVRAM_UpdateCustomBackupConfig_ RESTD WAIT
@@ -1204,7 +1227,7 @@ _ListContentsOfBackupFile()
 
    if ! _CheckForBackupFiles_
    then
-       _PrintError_ "Backup file(s) [${REDct}${nvramBackupFilesMatch}${NOct}] NOT FOUND."
+       _PrintError_ "Backup file(s) [${InvREDct} ${nvramBackupFilesMatch} ${NOct}] NOT FOUND."
        return 1
    fi
    _GetFileSelection_ "Select a backup file to list contents of:"
@@ -1233,7 +1256,7 @@ _DeleteSavedBackupFile_()
 
    if ! _CheckForBackupFiles_
    then
-       _PrintError_ "Backup file(s) [${REDct}${nvramBackupFilesMatch}${NOct}] NOT FOUND."
+       _PrintError_ "Backup file(s) [${InvREDct} ${nvramBackupFilesMatch} ${NOct}] NOT FOUND."
        return 1
    fi
    _GetFileSelection_ "Select a backup file to delete:" -MULTIOK
@@ -1294,7 +1317,7 @@ _SetMaxNumberOfBackupFiles_()
    while true
    do
        printf "Enter the maximum number of backups of NVRAM variables to keep.\n"
-       printf "[${theExitStr}] "
+       printf "[${theExitStr}]\n"
        printf "[Min=${GRNct}${NVRAMtheMinNumBackupFiles}${NOct},"
        printf " Max=${GRNct}${NVRAMtheMaxNumBackupFiles}${NOct}] |"
        printf " [Current Value: ${GRNct}${customMaxNumBackupFiles}${NOct}]:  "
@@ -1322,21 +1345,40 @@ _SetMaxNumberOfBackupFiles_()
 #------------------------------------------------------------------#
 _SetVarsListFilePath_()
 {
-   local newVarsListFilePath=""
+   local newVarsListFilePath=""  colorCode  clearCode
 
    echo
    while true
    do
+      if [ -s "$nvramVarsListFilePath" ]
+      then
+          colorCode=" $GRNct"
+          clearCode="$NOct"
+      else
+          colorCode="$InvREDct "
+          clearCode=" $NOct"
+      fi
+
       printf "Enter the full path of the file containing the list of NVRAM variables to back up.\n"
-      printf "[${theExitStr}] [CURRENT: ${GRNct}${nvramVarsListFilePath}${NOct}]:  "
+      printf "[${theExitStr}]\n[CURRENT:${colorCode}${nvramVarsListFilePath}${clearCode}]:  "
       read -r userInput
 
-      if [ -z "$userInput" ] || \
-         echo "$userInput" | grep -qE "^(e|exit|Exit)$"
-      then newVarsListFilePath="$nvramVarsListFilePath" ; break ; fi
+      if echo "$userInput" | grep -qE "^(e|exit|Exit)$" || \
+         { [ -z "$userInput" ] && [ -s "$nvramVarsListFilePath" ] ; }
+      then
+          newVarsListFilePath="$nvramVarsListFilePath"
+          break
+      fi
+
+      if [ -z "$userInput" ] && [ ! -s "$nvramVarsListFilePath" ]
+      then
+          _PrintError_ "The file [${InvREDct} ${nvramVarsListFilePath} ${NOct}] does NOT exist.\n"
+          continue
+      fi
 
       if echo "$userInput" | grep -q '/$'
-      then userInput="${userInput%/*}" ; fi
+      then userInput="${userInput%/*}"
+      fi
 
       if echo "$userInput" | grep -q '//'   || \
          echo "$userInput" | grep -q '/$'   || \
@@ -1348,15 +1390,15 @@ _SetVarsListFilePath_()
           continue
       fi
 
-      if [ -f "$userInput" ]
+      if [ -s "$userInput" ]
       then newVarsListFilePath="$userInput" ; break ; fi
 
-      _PrintError_ "The file '${REDct}${userInput}${NOct}' does NOT exist.\n"
+      _PrintError_ "The file [${InvREDct} ${userInput} ${NOct}] does NOT exist.\n"
    done
 
-   if [ ! -f "$newVarsListFilePath" ]
+   if [ ! -s "$newVarsListFilePath" ]
    then
-       _PrintError_ "File [${REDct}${newVarsListFilePath}${NOct}] NOT FOUND."
+       _PrintError_ "File [${InvREDct} ${newVarsListFilePath} ${NOct}] NOT FOUND."
        _WaitForEnterKey_ ; return 1
    fi
    _NVRAM_UpdateCustomBackupConfig_ LIST_FILE "$newVarsListFilePath"
@@ -1372,7 +1414,7 @@ _SetCustomBackupDirectory_()
    while true
    do
       printf "Enter the directory path where the backups subdirectory [${GRNct}${NVRAM_VarsBackupDIRname}${NOct}] will be stored.\n"
-      printf "[${theExitStr}] [CURRENT: ${GRNct}${nvramVarsUserBackupDir%/*}${NOct}]:  "
+      printf "[${theExitStr}]\n[CURRENT: ${GRNct}${nvramVarsUserBackupDir%/*}${NOct}]:  "
       read -r userInput
 
       if [ -z "$userInput" ] || \
@@ -1398,12 +1440,12 @@ _SetCustomBackupDirectory_()
       rootDir="${userInput%/*}"
       if [ ! -d "$rootDir" ]
       then
-          _PrintError_ "Root directory path [${REDct}${rootDir}${NOct}] does NOT exist.\n"
+          _PrintError_ "Root directory path [${InvREDct} ${rootDir} ${NOct}] does NOT exist.\n"
           printf "${REDct}INVALID input.${NOct}\n\n"
           continue
       fi
 
-      printf "The directory path '${REDct}${userInput}${NOct}' does NOT exist.\n\n"
+      printf "The directory path [${InvREDct} ${userInput} ${NOct}] does NOT exist.\n\n"
       if ! _WaitForResponse_ "Do you want to create it now"
       then
           printf "Directory was ${REDct}NOT${NOct} created.\n\n"
@@ -1411,7 +1453,7 @@ _SetCustomBackupDirectory_()
           mkdir -m 755 "$userInput" 2>/dev/null
           if [ -d "$userInput" ]
           then newBackupDirPath="$userInput" ; break
-          else _PrintError_ "Could NOT create directory [${REDct}${userInput}${NOct}].\n"
+          else _PrintError_ "Could NOT create directory [${InvREDct} ${userInput} ${NOct}].\n"
           fi
       fi
    done
@@ -1445,36 +1487,80 @@ _SetCustomBackupDirectory_()
 }
 
 #------------------------------------------------------------------#
+_GetCenterPadNums_()
+{
+   if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+   then return 0
+   fi
+   local  fullStrLen  stringLen0  padStrLen0
+
+   stringLen0="${#1}"
+   padStrLen1="$((($2 - stringLen0)/2))"
+   padStrLen2="$padStrLen1"
+   fullStrLen="$((padStrLen1 + stringLen0 + padStrLen2))"
+
+   if [ "$fullStrLen" -lt "$2" ]
+   then padStrLen2="$((padStrLen2 + 1))"
+   elif [ "$fullStrLen" -gt "$2" ]
+   then padStrLen1="$((padStrLen1 - 1))"
+   fi
+}
+
+#------------------------------------------------------------------#
 _ShowBackupRestoreMenuOptions_()
 {
-   SEPstr="--------------------------------------------------------------------"
-   printf "\n${SEPstr}\n"
+   SEPstr1="----------------------------------------------------------------"
+   SEPstr2="########################################################"
    _CheckForBackupFiles_
 
-   printf "\n ${YLWct}${MaxBckupsOpt}${NOct}.  Maximum number of backup files to keep."
+   local fullSpaceLen=50  padStrLen1  padStrLen2  colorCode  clearCode
+   _GetCenterPadNums_ "$version_TAG" "$fullSpaceLen"
+
+   printf "\n${SEPstr2}\n"
+   printf "##    Save and Restore Utility for NVRAM Variables    ##\n"
+   printf "##%*s[${GRNct}${version_TAG}${NOct}]%*s##" "$padStrLen1" '' "$padStrLen2" ''
+   printf "\n${SEPstr2}\n"
+
+   printf "\n ${GRNct}${MaxBckupsOpt}${NOct}.  Maximum number of backup files to keep."
    printf "\n      [Current Max: ${GRNct}${customMaxNumBackupFiles}${NOct}]\n"
 
-   printf "\n ${YLWct}${BackupDirOpt}${NOct}.  Directory path where backup files are stored."
-   printf "\n      [Current Path: ${GRNct}${nvramVarsUserBackupDir}${NOct}]\n"
-
-   printf "\n ${YLWct}${ListFileOpt}${NOct}.  File containing a list of NVRAM variable key names to back up."
-   printf "\n      [Current Path: ${GRNct}${nvramVarsListFilePath}${NOct}]\n"
-
-   if [ -d "$nvramVarsUserBackupDir" ] && [ -f "$nvramVarsListFilePath" ]
+   if [ -d "$nvramVarsUserBackupDir" ]
    then
-       printf "\n ${YLWct}${menuBckpOpt}${NOct}.  Back up NVRAM variables listed in the file."
-       printf "\n      [List File: ${GRNct}${nvramVarsListFilePath}${NOct}]\n"
+       colorCode=" $GRNct"
+       clearCode="$NOct"
+   else
+       colorCode="$InvREDct "
+       clearCode=" $NOct"
+   fi
+   printf "\n ${GRNct}${BackupDirOpt}${NOct}.  Directory path where backup files are stored."
+   printf "\n      [Current Path:${colorCode}${nvramVarsUserBackupDir}${clearCode}]\n"
+
+   if [ -s "$nvramVarsListFilePath" ]
+   then
+       colorCode=" $GRNct"
+       clearCode="$NOct"
+   else
+       colorCode="$InvREDct "
+       clearCode=" $NOct"
+   fi
+   printf "\n ${GRNct}${ListFileOpt}${NOct}.  File with a list of NVRAM variable key names to back up."
+   printf "\n      [Current File:${colorCode}${nvramVarsListFilePath}${clearCode}]\n"
+
+   if [ -d "$nvramVarsUserBackupDir" ] && [ -s "$nvramVarsListFilePath" ]
+   then
+       printf "\n ${GRNct}${menuBckpOpt}${NOct}.  Back up NVRAM variables listed in the file."
+       printf "\n      [Current File: ${GRNct}${nvramVarsListFilePath}${NOct}]\n"
    fi
 
    if "$backupsFound"
    then
-       printf "\n ${YLWct}${menuRestOpt}${NOct}.  Restore a backup of NVRAM variables.\n"
-       printf "\n ${YLWct}${menuDeltOpt}${NOct}.  Delete a previously saved backup file.\n"
-       printf "\n ${YLWct}${menuListOpt}${NOct}.  List contents of a previously saved backup file.\n"
+       printf "\n ${GRNct}${menuRestOpt}${NOct}.  Restore a backup of NVRAM variables.\n"
+       printf "\n ${GRNct}${menuDeltOpt}${NOct}.  Delete a previously saved backup file.\n"
+       printf "\n ${GRNct}${menuListOpt}${NOct}.  List contents of a previously saved backup file.\n"
    fi
 
-   printf "\n  ${YLWct}e${NOct}.  Exit.\n"
-   printf "\n${SEPstr}\n"
+   printf "\n  ${GRNct}e${NOct}.  Exit.\n"
+   printf "\n${SEPstr1}\n"
    return 0
 }
 
@@ -1505,7 +1591,7 @@ _MenuSelectionHandler_()
 
           if [ "$userOption" = "$menuBckpOpt" ] && \
              [ -d "$nvramVarsUserBackupDir" ]   && \
-             [ -f "$nvramVarsListFilePath" ]
+             [ -s "$nvramVarsListFilePath" ]
           then _SaveVarsFromUserList_ ; break ; fi
 
           if [ "$userOption" = "$menuRestOpt" ] && "$backupsFound"
@@ -1567,7 +1653,12 @@ then
 fi
 
 if ! _CheckCustomBackupConfig_
-then _ShowUsage_ ; fi
+then
+    if [ $# -eq 0 ] || \
+       echo "$1" | grep -qE "^(-backup|-restore)$"
+    then  _ShowUsage_
+    fi
+fi
 
 if [ $# -gt 0 ]
 then

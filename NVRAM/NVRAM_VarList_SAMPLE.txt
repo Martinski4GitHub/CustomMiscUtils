@@ -1,0 +1,88 @@
+#####################################################################
+# List of NVRAM variables to save to & restore from a backup file.
+# It's used as input file to the "SaveRestoreNVRAMvars.sh" script.
+#####################################################################
+
+#==== DO NOT EDIT THIS TAG ====#
+[Key Names]
+#==============================#
+
+#---------------------------------------------------#
+# LAN - DHCP Server: Manually assigned IP addresses #
+#---------------------------------------------------#
+# dhcp_hostnames
+# dhcp_staticlist
+# custom_clientlist
+
+#-------------------#
+# LAN - DHCP Server #
+#-------------------#
+# lan_ipaddr
+# lan_ipaddr_rt
+# lan_netmask
+# lan_netmask_rt
+# lan1_netmask
+
+# dhcp_start
+# dhcp_end
+# dhcp_lease
+# lan_lease
+# wan0_lease
+
+#----------------------------------------#
+# WAN - Virtual Server / Port Forwarding #
+#----------------------------------------#
+# vts_enable_x
+# vts_rulelist
+
+#==== DO NOT EDIT THIS TAG ====#
+[Key Names: RegEx]
+#==============================#
+
+# vpn_loglevel.*
+# wan[0-1]_vpndhcp
+
+#-----------------------#
+# 2.4 GHz WiFi Settings #
+#-----------------------#
+# wl0.1_.*
+# wl0.2_.*
+# wl0.3_.*
+
+#-----------------------#
+# 5.0 GHz WiFi Settings #
+#-----------------------#
+# wl1.1_.*
+# wl1.2_.*
+# wl1.3_.*
+
+#-----------------#
+# OpenVPN Servers #
+#-----------------#
+# vpn_upload_.*
+# vpn_server_.*
+# vpn_serverx_.*
+# vpn_server1_.*
+# vpn_server2_.*
+
+#-----------------#
+# OpenVPN Clients #
+#-----------------#
+# vpn_client_.*
+# vpn_clientx_.*
+# vpn_client[0-5]_.*
+
+#------------------#
+# WireGuard Server #
+#------------------#
+# wgs_.*
+# wgs1_.*
+# wgsc_.*
+
+#-------------------#
+# WireGuard Clients #
+#-------------------#
+# wgc_.*
+# wgc[1-5]_.*
+
+#EOF#
