@@ -10,11 +10,11 @@
 # section.
 #
 # Creation Date: 2021-Jan-24 [Martinski W.]
-# Last Modified: 2024-Dec-19 [Martinski W.]
+# Last Modified: 2025-Sep-02 [Martinski W.]
 ######################################################################
 set -u
 
-readonly ScriptVERSION="0.7.14"
+readonly ScriptVERSION="0.7.15"
 readonly version_TAG="Version: $ScriptVERSION"
 
 ScriptFolder="$(/usr/bin/dirname "$0")"
@@ -251,7 +251,7 @@ _NVRAM_GetFromCustomBackupConfig_()
       ! grep -q "^${keyName}=" "$SCRIPT_NVRAM_BACKUP_CONFIG"
    then echo "" ; return 1 ; fi
 
-   keyValue="$(grep "^${keyName}=" "$SCRIPT_NVRAM_BACKUP_CONFIG" | awk -F '=' '{print $2}')"
+   keyValue="$(grep "^${keyName}=" "$SCRIPT_NVRAM_BACKUP_CONFIG" | cut -d'=' -f2-)"
    echo "$keyValue" ; return 0
 }
 
@@ -267,7 +267,7 @@ _NVRAM_FixCustomBackupConfig_()
        return 0
    fi
 
-   keyValue="$(grep "^${keyName}=" "$SCRIPT_NVRAM_BACKUP_CONFIG" | awk -F '=' '{print $2}')"
+   keyValue="$(grep "^${keyName}=" "$SCRIPT_NVRAM_BACKUP_CONFIG" | cut -d'=' -f2-)"
    if [ -z "$keyValue" ] || [ "$keyValue" = "NONE" ]
    then
        fixedVal="$(echo "$2" | sed 's/[\/.*-]/\\&/g')"
@@ -329,7 +329,7 @@ _NVRAM_UpdateCustomBackupConfig_()
        return 0
    fi
 
-   keyValue="$(grep "^${keyName}=" "$SCRIPT_NVRAM_BACKUP_CONFIG" | awk -F '=' '{print $2}')"
+   keyValue="$(grep "^${keyName}=" "$SCRIPT_NVRAM_BACKUP_CONFIG" | cut -d'=' -f2-)"
    if [ -z "$keyValue" ] || [ "$keyValue" != "$2" ]
    then
        fixedVal="$(echo "$2" | sed 's/[\/.*-]/\\&/g')"
@@ -692,7 +692,7 @@ _NVRAM_VarSaveKeyValue_()
 
    if grep -qE "^${NVRAM_VarKeyName}=" "$NVRAM_TempShowVarFle"
    then
-       theKeyValue="$(grep -m1 -E "^${NVRAM_VarKeyName}=" "$NVRAM_TempShowVarFle" | awk -F '=' '{print $2}')"
+       theKeyValue="$(grep -m1 -E "^${NVRAM_VarKeyName}=" "$NVRAM_TempShowVarFle" | cut -d'=' -f2-)"
        echo "$theKeyValue" > "$NVRAM_KeyVARsaved"
        NVRAM_SavedOK=true
    fi
@@ -870,7 +870,7 @@ _NVRAM_GetKeyNamesFromRegExp_()
 
    while read -r theVarKeyEntry
    do
-       theKeyNameStr="$(echo "$theVarKeyEntry" | awk -F '=' '{print $1}')"
+       theKeyNameStr="$(echo "$theVarKeyEntry" | cut -d'=' -f1)"
        if [ -z "$theKeyNameStr" ] || ! _NVRAM_VarSetKeyInfo_ "$theKeyNameStr"
        then continue
        fi
