@@ -1,6 +1,9 @@
 #####################################################################
 # List of NVRAM variables to save to & restore from a backup file.
 # It's used as input file to the "SaveRestoreNVRAMvars.sh" script.
+# NOTE:
+# Remove the starting comment char '#' from the line to include
+# the NVRAM variable key name that you'd like to save & restore.
 #####################################################################
 
 #==== DO NOT EDIT THIS TAG ====#
