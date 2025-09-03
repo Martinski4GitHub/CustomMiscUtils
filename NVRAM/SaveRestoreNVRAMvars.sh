@@ -10,12 +10,19 @@
 # section.
 #
 # Creation Date: 2021-Jan-24 [Martinski W.]
-# Last Modified: 2025-Sep-02 [Martinski W.]
+# Last Modified: 2025-Sep-03 [Martinski W.]
 ######################################################################
 set -u
 
-readonly ScriptVERSION="0.7.15"
-readonly version_TAG="Version: $ScriptVERSION"
+readonly ScriptVERSION="0.7.16"
+readonly ScriptVERSTAG="25090300"
+readonly ScriptBRANCH="master"
+readonly branchStrTAG="Branch: $ScriptBRANCH"
+
+if [ "$ScriptBRANCH" = "master" ]
+then readonly versionStrTAG="Version: $ScriptVERSION"
+else readonly versionStrTAG="Version: ${ScriptVERSION}_${ScriptVERSTAG}"
+fi
 
 ScriptFolder="$(/usr/bin/dirname "$0")"
 if [ "$ScriptFolder" = "." ]
@@ -29,15 +36,18 @@ readonly customBackupFileExt="tar.gzip"
 readonly JFFS_SubDirBackupPrefix="JFFSsubdir"
 readonly NVRAM_VarsBackupFPrefix="NVRAM_Vars"
 readonly NVRAM_VarsBackupDIRname="NVRAM_VarsBackup"
-readonly NVRAM_VarsBackupCFGname="NVRAM_CustomBackupConfig.txt"
+readonly NVRAM_VarsBackupCFGname="SaveRestoreNVRAMconfig.cfg"
 readonly NVRAM_VarsBackupSTAname="NVRAM_CustomBackupStatus.txt"
+readonly NVRAM_OLD_BackupCFGname="NVRAM_CustomBackupConfig.txt"
 
 readonly NVRAM_Directory="${theJFFSdir}/nvram"
 readonly NVRAM_TempDIRname="nvramTempBackup"
 readonly NVRAM_TempDIRpath="${theTEMPdir}/$NVRAM_TempDIRname"
 readonly NVRAM_TempFilesMatch="${NVRAM_TempDIRpath}/NVRAMvar_*.TMP"
 readonly NVRAM_TempShowVarFle="${NVRAM_TempDIRpath}/NVRAMshowVars.TMP"
-readonly NVRAM_TempShowFilter="([0-3]:.*|ASUS_EULA_time=|TM_EULA_time=|sys_uptime_now=)"
+readonly NVRAM_TempShowFiltr1="(sys_uptime_now|rc_support|nc_setting_conf|setting_update_time)"
+readonly NVRAM_TempShowFiltr2="([0-3]:.*|asd_.*|asdfile_.*|TM_EULA.*|ASUS.*EULA.*|Ate_.*|.*login_timestamp=)"
+readonly NVRAM_TempShowFilter="^${NVRAM_TempShowFiltr2}|^${NVRAM_TempShowFiltr1}=|^$"
 
 readonly NVRAM_ConfigVarPrefix="NVRAM_"
 readonly NVRAM_DefUserBackupDir="/opt/var/$NVRAM_VarsBackupDIRname"
@@ -45,6 +55,7 @@ readonly NVRAM_AltUserBackupDir="/jffs/configs/$NVRAM_VarsBackupDIRname"
 
 readonly SCRIPT_NVRAM_BACKUP_STATUS="/tmp/$NVRAM_VarsBackupSTAname"
 readonly SCRIPT_NVRAM_BACKUP_CONFIG="${ScriptFolder}/$NVRAM_VarsBackupCFGname"
+readonly SCRIPT_NVRAM_OLDBCK_CONFIG="${ScriptFolder}/$NVRAM_OLD_BackupCFGname"
 readonly nvramBackupCFGCommentLine="## DO *NOT* EDIT THIS FILE BELOW THIS LINE. IT'S DYNAMICALLY UPDATED ##"
 readonly Line0SEP="========================================================================="
 
@@ -152,7 +163,7 @@ _WaitForEnterKey_()
 {
    ! "$isInteractive" && return 0
    printf "\nPress <Enter> key to continue..."
-   read -r EnterKEY ; echo
+   read -rs EnterKEY ; echo
 }
 
 #------------------------------------------------------------------#
@@ -340,8 +351,13 @@ _NVRAM_UpdateCustomBackupConfig_()
 #------------------------------------------------------------------#
 _NVRAM_InitCustomBackupConfig_()
 {
+   if [ -s "$SCRIPT_NVRAM_OLDBCK_CONFIG" ]
+   then
+       mv -f "$SCRIPT_NVRAM_OLDBCK_CONFIG" "$SCRIPT_NVRAM_BACKUP_CONFIG"
+   fi
+
    thePrefix="$NVRAM_ConfigVarPrefix"
-   if [ ! -f "$SCRIPT_NVRAM_BACKUP_CONFIG" ]
+   if [ ! -s "$SCRIPT_NVRAM_BACKUP_CONFIG" ]
    then
       {
        echo "$nvramBackupCFGCommentLine"
@@ -920,8 +936,8 @@ _SaveVarsFromUserList_()
    if [ ! -d "$NVRAM_TempDIRpath" ]
    then mkdir -m 755 "$NVRAM_TempDIRpath" 2>/dev/null ; fi
 
-   # Create temporary file showing current NVRAM variables #
-   nvram show 2>/dev/null | grep -vE "^$NVRAM_TempShowFilter" | sort -d -t '=' -k 1 > "$NVRAM_TempShowVarFle"
+   # Create temporary file with current NVRAM variables #
+   nvram show 2>/dev/null | grep -vE "^$NVRAM_TempShowFilter" | sort -u | sort -d -t '=' -k 1 > "$NVRAM_TempShowVarFle"
 
    inputListCount=0
    nvramVarOKCount=0
@@ -1514,11 +1530,11 @@ _ShowBackupRestoreMenuOptions_()
    _CheckForBackupFiles_
 
    local fullSpaceLen=50  padStrLen1  padStrLen2  colorCode  clearCode
-   _GetCenterPadNums_ "$version_TAG" "$fullSpaceLen"
+   _GetCenterPadNums_ "$versionStrTAG" "$fullSpaceLen"
 
    printf "\n${SEPstr2}\n"
    printf "##    Save and Restore Utility for NVRAM Variables    ##\n"
-   printf "##%*s[${GRNct}${version_TAG}${NOct}]%*s##" "$padStrLen1" '' "$padStrLen2" ''
+   printf "##%*s[${GRNct}${versionStrTAG}${NOct}]%*s##" "$padStrLen1" '' "$padStrLen2" ''
    printf "\n${SEPstr2}\n"
 
    printf "\n ${GRNct}${MaxBckupsOpt}${NOct}.  Maximum number of backup files to keep."
