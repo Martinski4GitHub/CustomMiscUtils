@@ -10,12 +10,12 @@
 # section.
 #
 # Creation Date: 2021-Jan-24 [Martinski W.]
-# Last Modified: 2025-Sep-03 [Martinski W.]
+# Last Modified: 2025-Sep-05 [Martinski W.]
 ######################################################################
 set -u
 
-readonly ScriptVERSION="0.7.16"
-readonly ScriptVERSTAG="25090300"
+readonly ScriptVERSION="0.7.17"
+readonly ScriptVERSTAG="25090500"
 readonly ScriptBRANCH="master"
 readonly branchStrTAG="Branch: $ScriptBRANCH"
 
@@ -28,12 +28,12 @@ ScriptFolder="$(/usr/bin/dirname "$0")"
 if [ "$ScriptFolder" = "." ]
 then ScriptFolder="$(pwd)" ; fi
 
+readonly theETCdir="/etc"
 readonly theJFFSdir="/jffs"
 readonly theTEMPdir="/tmp/var/tmp"
 readonly theScriptFName="${0##*/}"
 
 readonly customBackupFileExt="tar.gzip"
-readonly JFFS_SubDirBackupPrefix="JFFSsubdir"
 readonly NVRAM_VarsBackupFPrefix="NVRAM_Vars"
 readonly NVRAM_VarsBackupDIRname="NVRAM_VarsBackup"
 readonly NVRAM_VarsBackupCFGname="SaveRestoreNVRAMconfig.cfg"
@@ -66,6 +66,7 @@ readonly LghtGREEN="\e[1;32m"
 readonly LghtYELLOW="\e[1;33m"
 readonly InvREDct="\e[41m"
 readonly InvBYLWct="\e[30;103m"
+readonly MGNTct="\e[1;35m"
 readonly REDct="${DarkRED}${BOLDtext}"
 readonly GRNct="${LghtGREEN}${BOLDtext}"
 readonly YLWct="${LghtYELLOW}${BOLDtext}"
@@ -85,18 +86,21 @@ readonly NVRAMtheMinNumBackupFiles=5
 readonly NVRAMtheMaxNumBackupFiles=50
 readonly NVRAMdefMaxNumBackupFiles=20
 
-## For JFFS subdirectories tightly coupled with NVRAM settings ##
-JFFS_SubDirNTag=""
-JFFS_SubDirName=""
-JFFS_SubDirPath=""
-JFFS_TempDIRpath=""
-JFFS_BackupFPath=""
-JFFS_SubDirFilesMatch=""
-JFFS_BackupFilesMatch=""
-JFFS_OPVPN_BackedUp=false
-JFFS_OPVPN_Restored=false
-JFFS_ICONS_BackedUp=false
-JFFS_ICONS_Restored=false
+## For additional subdirectories tightly coupled with NVRAM settings ##
+BKUP_SubDirNTag=""
+BKUP_SubDirName=""
+BKUP_SubDirPath=""
+BKUP_RootDirTag=""
+BKUP_TempDIRpath=""
+BKUP_BackupFPath=""
+BKUP_SubDirFilesMatch=""
+BKUP_BackupFilesMatch=""
+DIR_OPVPN_BackedUp=false
+DIR_OPVPN_Restored=false
+DIR_ICONS_BackedUp=false
+DIR_ICONS_Restored=false
+DIR_WRGRD_BackedUp=false
+DIR_WRGRD_Restored=false
 
 backupsFound=false
 isVerbose=false
@@ -429,7 +433,7 @@ _NVRAM_ValidateUserBackupDirectory_()
    if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1; fi
 
    [ ! -d "$nvramVarsUserBackupDir" ] && \
-   mkdir -m 755 "$nvramVarsUserBackupDir" 2>/dev/null
+   mkdir -m 755 -p "$nvramVarsUserBackupDir" 2>/dev/null
    [ -d "$nvramVarsUserBackupDir" ] && return 0
 
    if [ -z "$defUSBMountPoint" ] && \
@@ -478,9 +482,10 @@ _NVRAM_GetCustomBackupConfigVars_()
    fi
 
    for nextBKdir in "$nvramVarsSavdBackupDir" "$NVRAM_DefUserBackupDir" "$NVRAM_AltUserBackupDir"
-   do _NVRAM_ValidateUserBackupDirectory_ "$nextBKdir" && break ; done
+   do _NVRAM_ValidateUserBackupDirectory_ "$nextBKdir" && break
+   done
 
-   mkdir -m 755 "$nvramVarsUserBackupDir" 2>/dev/null
+   mkdir -m 755 -p "$nvramVarsUserBackupDir" 2>/dev/null
    if [ ! -d "$nvramVarsUserBackupDir" ]
    then
        _PrintError_ "Backup directory [${InvREDct} ${nvramVarsUserBackupDir} ${NOct}] NOT FOUND."
@@ -540,126 +545,172 @@ _CheckCustomBackupConfig_()
 }
 
 #------------------------------------------------------------------#
-_JFFS_SetSubDirVars_()
+_BKUP_SetSubDirVars_()
 {
-   if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
    then
-       _PrintError_ "JFFS subdirectory parameters [${REDct}${*}${NOct}] EMPTY.\n"
+       _PrintError_ "Backup subdirectory parameters [${REDct}${*}${NOct}] EMPTY.\n"
        return 1
    fi
 
    local subDirFilesMatch="*"
    if [ "$1" = "ICONS" ] ; then subDirFilesMatch="*.log" ; fi
 
-   JFFS_SubDirNTag="$1"
-   JFFS_SubDirName="$2"
-   JFFS_SubDirPath="${theJFFSdir}/$2"
-   JFFS_TempDIRpath="$NVRAM_TempDIRpath"
-   JFFS_BackupFPath="${JFFS_TempDIRpath}/${JFFS_SubDirBackupPrefix}_$1"
-   JFFS_SubDirFilesMatch="${JFFS_SubDirPath}/$subDirFilesMatch"
-   JFFS_BackupFilesMatch="${JFFS_BackupFPath}.$customBackupFileExt"
+   case "$3" in
+        'ETC') BKUP_SubDirPath="${theETCdir}/$2" ;;
+       'JFFS') BKUP_SubDirPath="${theJFFSdir}/$2" ;;
+   esac
 
-   if [ ! -d "$JFFS_TempDIRpath" ]
-   then mkdir -m 755 "$JFFS_TempDIRpath" 2>/dev/null ; fi
+   BKUP_SubDirNTag="$1"
+   BKUP_SubDirName="$2"
+   BKUP_RootDirTag="$3"
+   BKUP_TempDIRpath="$NVRAM_TempDIRpath"
+   BKUP_BackupFPath="${BKUP_TempDIRpath}/${3}subdir_$1"
+   BKUP_SubDirFilesMatch="${BKUP_SubDirPath}/$subDirFilesMatch"
+   BKUP_BackupFilesMatch="${BKUP_BackupFPath}.$customBackupFileExt"
+
+   if [ ! -d "$BKUP_TempDIRpath" ]
+   then mkdir -m 755 "$BKUP_TempDIRpath" 2>/dev/null
+   fi
    return 0
 }
 
 #------------------------------------------------------------------#
-_JFFS_BackUpSubDirFiles_()
+_DIR_BackUpSubDirFiles_()
 {
-   local dirFileCount  retCode
+   local dirFileCount  rootDirPath  retCode
 
-   dirFileCount="$(_list2_ -1 "$JFFS_SubDirFilesMatch" 2>/dev/null | wc -l)"
-   if [ ! -d "$JFFS_SubDirPath" ] || [ "$dirFileCount" -eq 0 ]
-   then return 1 ; fi
+   dirFileCount="$(_list2_ -1 "$BKUP_SubDirFilesMatch" 2>/dev/null | wc -l)"
+   if [ ! -d "$BKUP_SubDirPath" ] || [ "$dirFileCount" -eq 0 ]
+   then return 1
+   fi
 
-   if ! tar -czf "$JFFS_BackupFilesMatch" -C "$theJFFSdir" "./$JFFS_SubDirName"
+   case "$BKUP_RootDirTag" in
+        'ETC') rootDirPath="$theETCdir" ;;
+       'JFFS') rootDirPath="$theJFFSdir" ;;
+            *) return 1 ;;
+   esac
+
+   if ! tar -czf "$BKUP_BackupFilesMatch" -C "$rootDirPath" "./$BKUP_SubDirName"
    then
        retCode=1
-       _PrintError_ "Could NOT save JFFS subdirectory [$JFFS_SubDirPath] files."
+       _PrintError_ "Could NOT save additional subdirectory \"${InvREDct}${BKUP_SubDirPath}${NOct}\" files."
    else
        retCode=0
-       eval JFFS_${JFFS_SubDirNTag}_BackedUp=true
-       chmod 664 "$JFFS_BackupFilesMatch"
-       _PrintMsg1_ "JFFS subdirectory \"${GRNct}${JFFS_SubDirPath}${NOct}\" was backed up.\n"
+       eval DIR_${BKUP_SubDirNTag}_BackedUp=true
+       chmod 664 "$BKUP_BackupFilesMatch"
+       _PrintMsg1_ "Additional subdirectory \"${GRNct}${BKUP_SubDirPath}${NOct}\" was backed up.\n"
    fi
    return "$retCode"
 }
 
 #------------------------------------------------------------------#
-_JFFS_BackUpSubDir_()
+_DIR_BackUpSubDir_()
 {
    case "$1" in
-       "OPVPN") _JFFS_SetSubDirVars_ "OPVPN" "openvpn" ;;
-       "ICONS") _JFFS_SetSubDirVars_ "ICONS" "usericon" ;;
+       "OPVPN") _BKUP_SetSubDirVars_ "OPVPN" "openvpn" "JFFS" ;;
+       "ICONS") _BKUP_SetSubDirVars_ "ICONS" "usericon" "JFFS" ;;
+       "WRGRD") _BKUP_SetSubDirVars_ "WRGRD" "wg" "ETC" ;;
        *)
-          JFFS_SubDirNTag="" ; JFFS_SubDirName="" ; JFFS_SubDirPath=""
-          _PrintError_ "JFFS directory tag [${REDct}${1}${NOct}] NOT VALID."
+          BKUP_SubDirNTag="" ; BKUP_RootDirTag=""
+          BKUP_SubDirName="" ; BKUP_SubDirPath=""
+          _PrintError_ "Backup directory tag [${InvREDct}${1}${NOct}] NOT VALID."
           return 1
           ;;
    esac
-   _JFFS_BackUpSubDirFiles_
+   _DIR_BackUpSubDirFiles_
 }
 
 #------------------------------------------------------------------#
-_JFFS_CheckToBackUpSubDir_()
+_DIR_CheckToBackUpSubDir_()
 {
    if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
 
-   if [ "$1" = "custom_clientlist" ] && ! "$JFFS_ICONS_BackedUp"
-   then _JFFS_BackUpSubDir_ "ICONS"
-   #
-   elif ! "$JFFS_OPVPN_BackedUp" && \
-        echo "$1" | grep -qE "^vpn_server[1-2]_|^vpn_client[0-5]_"
-   then _JFFS_BackUpSubDir_ "OPVPN" ; fi
+   if [ "$1" = "custom_clientlist" ] && ! "$DIR_ICONS_BackedUp"
+   then
+       _DIR_BackUpSubDir_ "ICONS"
+       return 0
+   fi
+   if ! "$DIR_OPVPN_BackedUp" && \
+        echo "$1" | grep -qE "^(vpn_server[1-2]_|vpn_client[0-5]_)"
+   then
+       _DIR_BackUpSubDir_ "OPVPN"
+       return 0
+   fi
+   if false && ! "$DIR_WRGRD_BackedUp" && \
+      echo "$1" | grep -qE "^(wgs1_|wgsc_|wgc[1-5]_)"
+   then
+       _DIR_BackUpSubDir_ "WRGRD"
+       return 0
+   fi
 }
 
 #------------------------------------------------------------------#
-_JFFS_RestoreSubDirFiles_()
+_DIR_RestoreSubDirFiles_()
 {
-   local retCode
+   local rootDirPath  retCode
 
-   if [ ! -d "$JFFS_TempDIRpath" ] || [ ! -f "$JFFS_BackupFilesMatch" ]
-   then return 1 ; fi
+   if [ ! -d "$BKUP_TempDIRpath" ] || [ ! -f "$BKUP_BackupFilesMatch" ]
+   then return 1
+   fi
 
-   if ! tar -xzf "$JFFS_BackupFilesMatch" -C "$theJFFSdir"
+   case "$BKUP_RootDirTag" in
+        'ETC') rootDirPath="$theETCdir" ;;
+       'JFFS') rootDirPath="$theJFFSdir" ;;
+            *) return 1 ;;
+   esac
+
+   if ! tar -xzf "$BKUP_BackupFilesMatch" -C "$rootDirPath"
    then
        retCode=1
-       _PrintError_ "JFFS subdirectory \"${REDct}${JFFS_SubDirPath}${NOct}\" was *NOT* restored."
+       _PrintError_ "Backup subdirectory \"${InvREDct}${BKUP_SubDirPath}${NOct}\" was *NOT* restored."
    else
        retCode=0
-       eval JFFS_${JFFS_SubDirNTag}_Restored=true
-       _PrintMsg1_ "JFFS subdirectory \"${GRNct}${JFFS_SubDirPath}${NOct}\" was restored.\n"
+       eval DIR_${BKUP_SubDirNTag}_Restored=true
+       _PrintMsg1_ "Backup subdirectory \"${GRNct}${BKUP_SubDirPath}${NOct}\" was restored.\n"
    fi
    return "$retCode"
 }
 
 #------------------------------------------------------------------#
-_JFFS_RestoreSubDir_()
+_DIR_RestoreSubDir_()
 {
    case "$1" in
-       "OPVPN") _JFFS_SetSubDirVars_ "OPVPN" "openvpn" ;;
-       "ICONS") _JFFS_SetSubDirVars_ "ICONS" "usericon" ;;
+       "OPVPN") _BKUP_SetSubDirVars_ "OPVPN" "openvpn" "JFFS" ;;
+       "ICONS") _BKUP_SetSubDirVars_ "ICONS" "usericon" "JFFS" ;;
+       "WRGRD") _BKUP_SetSubDirVars_ "WRGRD" "wg" "ETC" ;;
        *)
-          JFFS_SubDirNTag="" ; JFFS_SubDirName="" ; JFFS_SubDirPath=""
-          _PrintError_ "JFFS directory tag [${REDct}${1}${NOct}] NOT VALID."
+          BKUP_SubDirNTag="" ; BKUP_RootDirTag=""
+          BKUP_SubDirName="" ; BKUP_SubDirPath=""
+          _PrintError_ "Backup directory tag [${InvREDct}${1}${NOct}] NOT VALID."
           return 1
           ;;
    esac
-   _JFFS_RestoreSubDirFiles_
+   _DIR_RestoreSubDirFiles_
 }
 
 #------------------------------------------------------------------#
-_JFFS_CheckToRestoreSubDir_()
+_DIR_CheckToRestoreSubDir_()
 {
    if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
 
-   if [ "$1" = "custom_clientlist" ] && ! "$JFFS_ICONS_Restored"
-   then _JFFS_RestoreSubDir_ "ICONS"
-   #
-   elif ! "$JFFS_OPVPN_Restored" && \
-        echo "$1" | grep -qE "^vpn_server[1-2]_|^vpn_client[0-5]_"
-   then _JFFS_RestoreSubDir_ "OPVPN" ; fi
+   if [ "$1" = "custom_clientlist" ] && ! "$DIR_ICONS_Restored"
+   then
+       _DIR_RestoreSubDir_ "ICONS"
+       return 0
+   fi
+   if ! "$DIR_OPVPN_Restored" && \
+        echo "$1" | grep -qE "^(vpn_server[1-2]_|vpn_client[0-5]_)"
+   then
+       _DIR_RestoreSubDir_ "OPVPN"
+       return 0
+   fi
+   if false && ! "$DIR_WRGRD_Restored" && \
+      echo "$1" | grep -qE "^(wgs1_|wgsc_|wgc[1-5]_)"
+   then
+       _DIR_RestoreSubDir_ "WRGRD"
+       return 0
+   fi
 }
 
 #------------------------------------------------------------------#
@@ -673,8 +724,9 @@ _NVRAM_CleanupTempFiles_()
        _remf_ "${NVRAM_TempDIRpath}/*.$customBackupFileExt"
        rmdir "$NVRAM_TempDIRpath" 2>/dev/null
 
-       JFFS_ICONS_BackedUp=false ; JFFS_ICONS_Restored=false
-       JFFS_OPVPN_BackedUp=false ; JFFS_OPVPN_Restored=false
+       DIR_ICONS_BackedUp=false ; DIR_ICONS_Restored=false
+       DIR_OPVPN_BackedUp=false ; DIR_OPVPN_Restored=false
+       DIR_WRGRD_BackedUp=false ; DIR_WRGRD_Restored=false
    fi
 }
 
@@ -684,14 +736,15 @@ _NVRAM_VarSetKeyInfo_()
    if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
    if echo "$1" | grep -q "[^a-zA-Z0-9_.:-]"
    then
-       _PrintError_ "NVRAM variable key name \"${REDct}${1}${NOct}\" *NOT* VALID."
+       _PrintError_ "NVRAM variable key name \"${InvREDct}${1}${NOct}\" *NOT* VALID."
        return 1
    fi
    NVRAM_VarKeyName="$1"
    NVRAM_KeyVARsaved="${NVRAM_TempDIRpath}/NVRAMvar_${NVRAM_VarKeyName}.TMP"
    NVRAM_KeyFLEsaved="${NVRAM_TempDIRpath}/NVRAMfle_${NVRAM_VarKeyName}.TMP"
    if [ ! -d "$NVRAM_TempDIRpath" ]
-   then mkdir -m 755 "$NVRAM_TempDIRpath" 2>/dev/null ; fi
+   then mkdir -m 755 "$NVRAM_TempDIRpath" 2>/dev/null
+   fi
    return 0
 }
 
@@ -715,7 +768,7 @@ _NVRAM_VarSaveKeyValue_()
 
    if "$NVRAM_SavedOK"
    then
-       _JFFS_CheckToBackUpSubDir_ "$NVRAM_VarKeyName"
+       _DIR_CheckToBackUpSubDir_ "$NVRAM_VarKeyName"
        _PrintMsg1_ "NVRAM variable \"${GRNct}${NVRAM_VarKeyName}${NOct}\" was backed up.\n"
        return 0
    fi
@@ -758,7 +811,8 @@ _NVRAM_VarRestoreKeyValue_()
    _NVRAM_CleanupTempFiles_
 
    if "$NVRAM_RestoredOK" || "$NVRAM_FoundOK"
-   then _JFFS_CheckToRestoreSubDir_ "$NVRAM_VarKeyName" ; fi
+   then _DIR_CheckToRestoreSubDir_ "$NVRAM_VarKeyName"
+   fi
 
    if "$NVRAM_RestoredOK"
    then
@@ -768,11 +822,11 @@ _NVRAM_VarRestoreKeyValue_()
    if "$NVRAM_FoundOK"
    then
        NVRAM_VarFoundOK=true
-       _PrintMsg1_ "NVRAM variable \"${GRNct}${NVRAM_VarKeyName}${NOct}\" did NOT need to be restored.\n"
+       _PrintMsg1_ "NVRAM variable \"${GRNct}${NVRAM_VarKeyName}${NOct}\" did NOT need to be restored (same value).\n"
        return 1
    fi
 
-   _PrintError_ "NVRAM variable \"${REDct}${NVRAM_VarKeyName}${NOct}\" was *NOT* restored."
+   _PrintError_ "NVRAM variable \"${InvREDct}${NVRAM_VarKeyName}${NOct}\" was *NOT* restored."
    return 1
 }
 
@@ -934,7 +988,8 @@ _SaveVarsFromUserList_()
    _NVRAM_CleanupTempFiles_ -ALL
 
    if [ ! -d "$NVRAM_TempDIRpath" ]
-   then mkdir -m 755 "$NVRAM_TempDIRpath" 2>/dev/null ; fi
+   then mkdir -m 755 "$NVRAM_TempDIRpath" 2>/dev/null
+   fi
 
    # Create temporary file with current NVRAM variables #
    nvram show 2>/dev/null | grep -vE "^$NVRAM_TempShowFilter" | sort -u | sort -d -t '=' -k 1 > "$NVRAM_TempShowVarFle"
@@ -1210,7 +1265,7 @@ EOT
    then
        retCode=99
        _NVRAM_UpdateCustomBackupConfig_ RESTD NONE STATUSupdate
-       _PrintError_ "Could NOT restore NVRAM variables."
+       _PrintError_ "Could ${REDct}NOT${NOct} restore NVRAM variables."
    else
        retCode=0
        if _NVRAM_VarRestoreKeysFromBackup_
@@ -1530,12 +1585,19 @@ _ShowBackupRestoreMenuOptions_()
    _CheckForBackupFiles_
 
    local fullSpaceLen=50  padStrLen1  padStrLen2  colorCode  clearCode
-   _GetCenterPadNums_ "$versionStrTAG" "$fullSpaceLen"
 
    printf "\n${SEPstr2}\n"
    printf "##    Save and Restore Utility for NVRAM Variables    ##\n"
-   printf "##%*s[${GRNct}${versionStrTAG}${NOct}]%*s##" "$padStrLen1" '' "$padStrLen2" ''
-   printf "\n${SEPstr2}\n"
+
+   _GetCenterPadNums_ "$versionStrTAG" "$fullSpaceLen"
+   printf "##%*s[${GRNct}${versionStrTAG}${NOct}]%*s##\n" "$padStrLen1" '' "$padStrLen2" ''
+
+   if [ "$ScriptBRANCH" = "develop" ]
+   then
+       _GetCenterPadNums_ "$branchStrTAG" "$fullSpaceLen"
+       printf "##%*s[${MGNTct}${branchStrTAG}${NOct}]%*s##\n" "$padStrLen1" '' "$padStrLen2" ''
+   fi
+   printf "${SEPstr2}\n"
 
    printf "\n ${GRNct}${MaxBckupsOpt}${NOct}.  Maximum number of backup files to keep."
    printf "\n      [Current Max: ${GRNct}${customMaxNumBackupFiles}${NOct}]\n"
