@@ -10,12 +10,12 @@
 # section.
 #
 # Creation Date: 2021-Jan-24 [Martinski W.]
-# Last Modified: 2025-Sep-05 [Martinski W.]
+# Last Modified: 2025-Sep-23 [Martinski W.]
 ######################################################################
 set -u
 
-readonly ScriptVERSION="0.7.17"
-readonly ScriptVERSTAG="25090500"
+readonly ScriptVERSION="0.7.18"
+readonly ScriptVERSTAG="25092312"
 readonly ScriptBRANCH="master"
 readonly branchStrTAG="Branch: $ScriptBRANCH"
 
@@ -117,7 +117,7 @@ NVRAM_KeyFLEsaved=""
 
 ## File containing list of NVRAM variable key names to back up ##
 NVRAM_VarListFName="NVRAM_VarList.txt"
-nvramVarsListFilePath="$(pwd)/$NVRAM_VarListFName"
+nvramVarsListFilePath="${ScriptFolder}/$NVRAM_VarListFName"
 
 #------------------------------------------------------------------#
 _ShowUsage_()
