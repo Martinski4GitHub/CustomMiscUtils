@@ -54,13 +54,13 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2025-Oct-12 [Martinski W.]
+# Last Modified: 2025-Nov-29 [Martinski W.]
 #########################################################################
 set -u
 
-readonly LMS_VERSION="0.7.12"
+readonly LMS_VERSION="0.7.13"
 readonly LMS_VERFILE="lmsVersion.txt"
-readonly LMS_VERSTAG="25101223"
+readonly LMS_VERSTAG="25112912"
 
 readonly SCRIPT_BRANCH="master"
 readonly LMS_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
@@ -787,7 +787,7 @@ _CreateEMailContent_()
            {
              printf "This notification is for <b>*TESTING*</b> PURPOSES ONLY.\n\n"
              printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdTestOnly}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -800,7 +800,7 @@ _CreateEMailContent_()
            {
              printf "<b>*WARNING*</b>\n"
              printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdWarning1}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -813,7 +813,7 @@ _CreateEMailContent_()
            {
              printf "<b>*WARNING*</b>\n"
              printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdWarning2}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -826,7 +826,7 @@ _CreateEMailContent_()
            {
              printf "<b>**ALERT**</b>\n"
              printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert1}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -839,7 +839,7 @@ _CreateEMailContent_()
            {
              printf "<b>**ALERT**</b>\n"
              printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert2}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -852,7 +852,7 @@ _CreateEMailContent_()
            {
              printf "<b>**ALERT**</b>\n"
              printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdRedAlert3}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -970,7 +970,7 @@ _CreateEMailContent_()
            {
              printf "This notification is for <b>*TESTING*</b> PURPOSES ONLY.\n\n"
              printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdTestOnly}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -983,7 +983,7 @@ _CreateEMailContent_()
            {
              printf "<b>*WARNING*</b>\n"
              printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdWarning1}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -996,7 +996,7 @@ _CreateEMailContent_()
            {
              printf "<b>*WARNING*</b>\n"
              printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdWarning2}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -1009,7 +1009,7 @@ _CreateEMailContent_()
            {
              printf "<b>**ALERT**</b>\n"
              printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert1}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -1022,7 +1022,7 @@ _CreateEMailContent_()
            {
              printf "<b>**ALERT**</b>\n"
              printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert2}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -1035,7 +1035,7 @@ _CreateEMailContent_()
            {
              printf "<b>**ALERT**</b>\n"
              printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdRedAlert3}%%</b>.\n"
-             printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
+             printf "\n%s" "$(df -hT | head -n1)"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
@@ -1847,6 +1847,40 @@ _CPU_Temperature_()
 }
 
 #-----------------------------------------------------------------------#
+_Show_USB_Drives_()
+{
+    local mounPointList  theMountPoint  mountPointCount
+    local mountPointDev  mounPointPath  readWriteChck
+    local mountPointRegExp="^/dev/sd.*[[:blank:]]+/tmp/mnt/.*"
+
+    mounPointList="$(grep -E "$mountPointRegExp" /proc/mounts)"
+    if [ -z "$mounPointList" ]
+    then
+        printf "\n\nINFO: No USB-attached drives were found mounted.\n\n"
+        return 1
+    fi
+
+    mountPointCount=0
+    while read -r theMountPoint
+    do
+        mountPointDev="$(echo "$theMountPoint" | awk -F ' ' '{print $1}')"
+        mounPointPath="$(echo "$theMountPoint" | awk -F ' ' '{print $2}')"
+        readWriteChck="$(echo "$theMountPoint" | awk -F ' ' '{print $4}' | cut -d',' -f1)"
+        df -hT "$mountPointDev" | grep -E "^${mountPointDev}[[:blank:]]+.*[[:blank:]]+${mounPointPath}$"
+
+        if [ -z "$readWriteChck" ]    || \
+           [ "$readWriteChck" = 'ro' ] || \
+           [ "$readWriteChck" != 'rw' ]
+        then
+            printf "**WARNING**: Mounted drive is NOT shown as writable.\n\n"
+        fi
+        mountPointCount="$((mountPointCount + 1))"
+    done <<EOT
+$(echo "$mounPointList" | sort -d -t ' ' -k 1)
+EOT
+}
+
+#-----------------------------------------------------------------------#
 _CompareNums_()
 {
     if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || \
@@ -2140,6 +2174,7 @@ fi
    _ProcMemInfo_ ; echo
    df -hT | head -n1
    df -hT | grep -E '(/jffs$|/tmp$|/var$)' | sort -d -t ' ' -k 7
+   _Show_USB_Drives_
    _Show_JFFS_Usage_
    _Show_NVRAM_Usage_
    case "$duUnits" in
