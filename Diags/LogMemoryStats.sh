@@ -1,28 +1,29 @@
 #!/bin/sh
-#####################################################################
+#########################################################################
 # LogMemoryStats.sh
 #
-# To log a snapshot of current RAM usage stats, including the
-# "tmpfs" filesystem (i.e. a virtual drive that uses RAM).
+# To view/log a snapshot of current memory usage, including
+# the "TMPFS" filesystem (i.e. a virtual drive that uses RAM).
 #
 # It also takes snapshots of file/directory usage in JFFS,
-# and the current top 10 processes based on "VSZ" size for
+# and the current top 15 processes based on "VSZ" size for
 # context and to capture any correlation between the usage
 # stats.
 #
 # EXAMPLE CALL:
-#   LogMemoryStats.sh  [kb|KB|mb|MB]
+# -------------
+# LogMemoryStats.sh [kb | KB | mb | MB]
 #
 # The *OPTIONAL* parameter indicates whether to keep track of
 # file/directory sizes in KBytes or MBytes. Since we're usually
-# looking for unexpected large files, we filter out < 750KBytes.
+# looking for unexpected large files, we filter out < 500KBytes.
 # If no parameter is given the default is the "Human Readable"
 # format.
 #
 # EMAIL NOTIFICATIONS:
 # --------------------
-#   LogMemoryStats.sh -enableEmailNotification
-#   LogMemoryStats.sh -disableEmailNotification
+# LogMemoryStats.sh -enableEmailNotification
+# LogMemoryStats.sh -disableEmailNotification
 #
 # The above calls allow you to toggle sending email notifications.
 # This feature requires having the AMTM email configuration option
@@ -30,51 +31,82 @@
 #
 # If enabled, script will send email notifications when specific
 # pre-defined thresholds are reached for the CPU temperature,
-# "JFFS" usage and "tmpfs" usage. Again, this works ONLY *IF*
+# "JFFS" usage and "TMPFS" usage. Again, this works ONLY *IF*
 # the AMTM email configuration option has been already set up.
 #
-# Call to check for script version updates:
-# LogMemoryStats.sh -versionCheck [-verbose | -quiet | -veryquiet]
+# CHECK FOR SCRIPT UPDATES:
+# -------------------------
+# LogMemoryStats.sh -versioncheck [-verbose | -quiet | -veryquiet]
 #
 # FOR DIAGNOSTICS PURPOSES:
 # -------------------------
-# Set up a cron job to periodically monitor and log RAM usage
-# stats every 2 to 6 hours to check for any "trends" in unusual
-# increases in RAM usage, especially if unexpected large files
-# are being created/stored in "tmpfs" (or "jffs") filesystem.
+# LogMemoryStats.sh -setcronjob
+#                   (No argument: set DEFAULT schedule to every 20 minutes)
 #
-# EXAMPLE:
-# cru a LogMemStats "0 */2 * * * /jffs/scripts/LogMemoryStats.sh"
-#--------------------------------------------------------------------
+# LogMemoryStats.sh -setcronjob [Xmins | Yhour]
+#                   VALID parameters are:
+#    [10mins | 12mins | 15mins | 20mins | 30mins | 60mins]
+#    [1hour | 2hour | 3hour | 4hour | 5hour | 6hour | 8hour | 12hour | 24hour]
+#
+# Set up a cron job to periodically monitor and log memory usage
+# every 'X' minutes *OR* every 'Y' hours to check for any trends
+# in unusual increases in memory usage, especially if unexpected
+# large files are being created in "TMPFS" or "JFFS" filesystem.
+#------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2025-Feb-16 [Martinski W.]
-#####################################################################
+# Last Modified: 2025-Oct-12 [Martinski W.]
+#########################################################################
 set -u
 
-readonly LMS_VERSION="0.7.11"
+readonly LMS_VERSION="0.7.12"
 readonly LMS_VERFILE="lmsVersion.txt"
+readonly LMS_VERSTAG="25101223"
 
-readonly LMS_SCRIPT_TAG="master"
-readonly LMS_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${LMS_SCRIPT_TAG}/Diags"
+readonly SCRIPT_BRANCH="master"
+readonly LMS_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
 
+readonly branchStr_TAG="[Branch: $SCRIPT_BRANCH]"
 readonly scriptFileName="${0##*/}"
 readonly scriptFileNTag="${scriptFileName%.*}"
 readonly scriptLogFName="${scriptFileNTag}.LOG"
 readonly backupLogFName="${scriptFileNTag}.BKP.LOG"
 readonly tempLogFPath="/tmp/var/tmp/${scriptFileNTag}.TMP.LOG"
-readonly duFilterSizeKB=750   #Filter for "du" output#
+readonly duFilterSizeKB=500   #Filter for "du" output#
 readonly CPU_TempProcDMU=/proc/dmu/temperature
 readonly CPU_TempThermal=/sys/devices/virtual/thermal/thermal_zone0/temp
 
+# Give priority to built-in binaries #
+export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
+
 #-----------------------------------------------------
 # Default maximum log file size in KByte units.
-# 1.0MByte should be enough to save at least 5 days
+# 1.0MByte should be enough to store about 5 days
 # worth of log entries, assuming you run the script
-# no more frequent than every 20 minutes.
+# no more frequently than every 20 minutes.
 #-----------------------------------------------------
-readonly MIN_LogFileSizeKB=100    #100KB#
+readonly MIN_LogFileSizeKB=512    #512KB#
+readonly MIN_LogFileSizeMB=0.5
 readonly DEF_LogFileSizeKB=1024   #1.0MB#
 readonly MAX_LogFileSizeKB=8192   #8.0MB#
+readonly MAX_LogFileSizeMB=8.0
+readonly xNumberRegExp="(0|0[.][0-9]{1,3}|[1-9][0-9]*|[1-9][0-9]*[.][0-9]{1,3})"
+
+readonly CRON_Tag="LogMemStats"
+readonly cronDefaultMins=5  #VALID: [0-5]#
+readonly cronDefaultHour=0  #VALID: [0-23]#
+readonly cronMinsRegExp0="[0-5]"  #NO Overlap#
+readonly cronMinsRegExp1="6|10|12|15|20|30|60"
+readonly cronMinsRegExp2="($cronMinsRegExp1)mins"
+readonly cronHourRegExp1="1|2|3|4|5|6|8|12|24"
+readonly cronHourRegExp2="($cronHourRegExp1)hour"
+readonly cronValidMins="10mins, 12mins, 15mins, 20mins, 30mins, 60mins"
+readonly cronValidHour="1hour, 2hour, 3hour, 4hour, 5hour, 6hour, 8hour, 12hour, 24hour"
+
+[ -z "${CRU_Cmd:+xSETx}" ] && CRU_Cmd="$(which cru)"
+if [ -z "$(which crontab)" ]
+then cronListCmd="$CRU_Cmd l"
+else cronListCmd="crontab -l"
+fi
 
 #-----------------------------------------------------
 # Make sure to set the log directory to a location
@@ -90,6 +122,7 @@ userLogDirectoryPath="$defLogDirectoryPath"
 scriptDirPath="$(/usr/bin/dirname "$0")"
 [ "$scriptDirPath" = "." ] && scriptDirPath="$(pwd)"
 
+readonly scriptFilePath="${scriptDirPath}/$scriptFileName"
 readonly logMemStatsCFGdir="/jffs/configs"
 readonly logMemStatsCFGname="LogMemStatsConfig.txt"
 readonly logMemStatsCFGfile="${logMemStatsCFGdir}/$logMemStatsCFGname"
@@ -103,9 +136,6 @@ readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_E
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/master/EMail"
 
-# Give priority to built-in binaries #
-export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
-
 scriptLogFPath="${userLogDirectoryPath}/$scriptLogFName"
 backupLogFPath="${userLogDirectoryPath}/$backupLogFName"
 
@@ -113,17 +143,29 @@ isInteractive=false
 if [ -t 0 ] && ! tty | grep -qwi "not"
 then isInteractive=true ; fi
 
-if [ $# -eq 0 ] || [ -z "$1" ] || \
-   ! echo "$1" | grep -qE '^(kb|KB|mb|MB)$'
-then units="HR"
-else units="$1"
-fi
-
 #-----------------------------------------------------------------------#
 _PrintMsg_()
 {
    ! "$isInteractive" && return 0
-   printf "${1}"
+   printf "$1"
+}
+
+#-----------------------------------------------------------------------#
+_MsgToSysLog_()
+{
+   local msgType  prioNum=5
+   if [ $# -gt 1 ] && [ -n "$2" ]
+   then msgType="$2"
+   else msgType="NOTICE"
+   fi
+   case "$msgType" in
+       ALERT) prioNum=2 ;;
+       ERROR) prioNum=3 ;;
+        WARN) prioNum=4 ;;
+      NOTICE) prioNum=5 ;;
+        INFO) prioNum=6 ;;
+   esac
+   logger -t "${scriptFileName}_[$$]" -p $prioNum "$1"
 }
 
 #-----------------------------------------------------------------------#
@@ -132,6 +174,50 @@ _WaitForEnterKey_()
    ! "$isInteractive" && return 0
    printf "\nPress <Enter> key to continue..."
    read -rs EnterKEY ; echo
+}
+
+#-----------------------------------------------------------------------#
+_ShowUsage_()
+{
+   ! "$isInteractive" && return 0
+   cat <<EOF
+----------------------------------------------------------------------------
+SYNTAX:
+
+To view and log current snapshot of statuses:
+   ./$scriptFileName
+
+To get this usage and syntax description:
+   ./$scriptFileName [-help | help]
+
+To remove an existing CRON Job (if any):
+   ./$scriptFileName -delcronjob
+
+To create a CRON Job to execute every 20 minutes:
+   ./$scriptFileName -setcronjob
+
+To create a CRON Job to execute every X minutes:
+   ./$scriptFileName -setcronjob [10mins | 12mins | 15mins | 20mins | 30mins | 60mins]
+
+To create a CRON Job to execute every X hours:
+   ./$scriptFileName -setcronjob [1hour | 2hour | 3hour | 4hour | 5hour | 6hour | 8hour | 12hour | 24hour]
+
+To set the maximum size of the log file in MByte units [DEFAULT is 1.0MB = 1024KB]:
+   ./$scriptFileName -maxlogsize [$MIN_LogFileSizeMB to $MAX_LogFileSizeMB]
+
+To enable sending email notifications for threshold alerts:
+   ./$scriptFileName -enableEmailNotification
+
+To disable sending email notifications for threshold alerts:
+   ./$scriptFileName -disableEmailNotification
+
+To test alert notifications using some dummy/fake threshold data:
+   ./$scriptFileName [-cputest | -jffstest | -tmpfstest | -nvramtest]
+
+To check for script updates:
+   ./$scriptFileName -versioncheck [-verbose | -quiet | -veryquiet]
+----------------------------------------------------------------------------
+EOF
 }
 
 #-----------------------------------------------------------#
@@ -321,19 +407,19 @@ _CreateConfigurationFile_()
    [ ! -d "$logMemStatsCFGdir" ] && return 1
 
    {
-     echo "## $(date +'%Y-%b-%d, %I:%M:%S %p %Z') ##"
-     echo "maxLogFileSizeKB=$DEF_LogFileSizeKB"
-     echo "userLogDirectoryPath=\"${defLogDirectoryPath}\""
-     echo "prefLogDirectoryPath=\"${defLogDirectoryPath}\""
-     echo "cpuEnableEmailNotifications=true"
-     echo "cpuLastEmailNotificationTime=0_INIT"
-     echo "jffsEnableEmailNotifications=true"
-     echo "jffsLastEmailNotificationTime=0_INIT"
-     echo "nvramEnableEmailNotifications=true"
-     echo "nvramLastEmailNotificationTime=0_INIT"
-     echo "tmpfsEnableEmailNotifications=true"
-     echo "tmpfsLastEmailNotificationTime=0_INIT"
-     echo "isSendEmailNotificationsEnabled=false"
+      echo "## $(date +'%Y-%b-%d, %I:%M:%S %p %Z') ##"
+      echo "maxLogFileSizeKB=$DEF_LogFileSizeKB"
+      echo "userLogDirectoryPath=\"${defLogDirectoryPath}\""
+      echo "prefLogDirectoryPath=\"${defLogDirectoryPath}\""
+      echo "cpuEnableEmailNotifications=true"
+      echo "cpuLastEmailNotificationTime=0_INIT"
+      echo "jffsEnableEmailNotifications=true"
+      echo "jffsLastEmailNotificationTime=0_INIT"
+      echo "nvramEnableEmailNotifications=true"
+      echo "nvramLastEmailNotificationTime=0_INIT"
+      echo "tmpfsEnableEmailNotifications=true"
+      echo "tmpfsLastEmailNotificationTime=0_INIT"
+      echo "isSendEmailNotificationsEnabled=false"
    } > "$logMemStatsCFGfile"
 
    _PrintMsg_ "\nConfiguration file [$logMemStatsCFGfile] was created.\n"
@@ -441,11 +527,21 @@ _SetConfigurationOption_()
       [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
    then return 1; fi
    local keyName  keyValue  fixedVal  dateTimeStr
+   local doShowMsg=false  theMsge=""  emailOpt
+
+   _DoShowMsge_()
+   {
+       if "$doShowMsg" && [ -n "$theMsge" ]
+       then _PrintMsg_ "$theMsge"
+       fi
+   }
 
    case "$1" in
        maxLogFileSizeKB)
             maxLogFileSizeKB="$2"
             userMaxLogFileSize="$((maxLogFileSizeKB * 1024))"
+            doShowMsg=true
+            theMsge="\nMaximum log file size has has been set to ${maxLogFileSizeKB} KBytes.\n\n"
             ;;
        userLogDirectoryPath)
             userLogDirectoryPath="$2"
@@ -469,6 +565,9 @@ _SetConfigurationOption_()
             ;;
        isSendEmailNotificationsEnabled)
             isSendEmailNotificationsEnabled="$2"
+            doShowMsg=true
+            [ "$2" = "true" ] && emailOpt="ENABLED" || emailOpt="DISABLED"
+            theMsge="\nEmail Notification for alerts has been set to ${emailOpt}.\n\n"
             ;;
    esac
 
@@ -476,6 +575,7 @@ _SetConfigurationOption_()
    if ! grep -q "^${keyName}=" "$logMemStatsCFGfile"
    then
        echo "${keyName}=$2" >> "$logMemStatsCFGfile"
+       _DoShowMsge_
        return 0
    fi
 
@@ -494,6 +594,9 @@ _SetConfigurationOption_()
        else sed -i "s/^## [0-9]\+[-].*/$dateTimeStr/" "$logMemStatsCFGfile"
        fi
    fi
+
+   _DoShowMsge_
+   return 0
 }
 
 #-----------------------------------------------------------------------#
@@ -536,7 +639,7 @@ _CheckConfigurationFile_()
 #-----------------------------------------------------------------------#
 cpuTemperatureCelsius=""
 cpuTempThresholdTestOnly=false
-readonly cpuThermalThresholdTestOnly=11
+readonly cpuThermalThresholdTestOnly=10
 readonly cpuThermalThresholdWarning1=88
 readonly cpuThermalThresholdRedAlert1=90
 readonly cpuThermalThresholdRedAlert2=92
@@ -552,7 +655,7 @@ readonly cpuThermalThresholdRedAlert3=94
 # <= 90% Used = Green OK
 #-----------------------------------------------------------------------#
 nvramUsageThresholdTestOnly=false
-readonly nvramUsedThresholdTestOnly=22
+readonly nvramUsedThresholdTestOnly=10
 readonly nvramUsedThresholdWarning1=90
 readonly nvramUsedThresholdWarning2=93
 readonly nvramUsedThresholdRedAlert1=95
@@ -627,7 +730,7 @@ _CreateEMailContent_()
            emailSubject="Router CPU Temperature [TESTING]"
            emailBodyTitle="CPU Temperature: ${2}°C"
            {
-             printf "This notification is for <b>*TESTING*</b> purposes ONLY.\n\n"
+             printf "This notification is for <b>*TESTING*</b> PURPOSES ONLY.\n\n"
              printf "Router CPU temperature of <b>${2}°C</b> exceeds <b>${cpuThermalThresholdTestOnly}°C</b>.\n"
            } > "$tmpEMailBodyFile"
            ;;
@@ -682,7 +785,7 @@ _CreateEMailContent_()
            emailSubject="Router JFFS Usage [TESTING]"
            emailBodyTitle="JFFS Usage: ${2}%"
            {
-             printf "This notification is for <b>*TESTING*</b> purposes ONLY.\n\n"
+             printf "This notification is for <b>*TESTING*</b> PURPOSES ONLY.\n\n"
              printf "Router JFFS usage of <b>${2}%%</b> exceeds <b>${jffsUsedThresholdTestOnly}%%</b>.\n"
              printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
@@ -782,7 +885,7 @@ _CreateEMailContent_()
            emailSubject="Router NVRAM Usage [TESTING]"
            emailBodyTitle="NVRAM Usage: ${2}%"
            {
-             printf "This notification is for <b>*TESTING*</b> purposes ONLY.\n\n"
+             printf "This notification is for <b>*TESTING*</b> PURPOSES ONLY.\n\n"
              printf "Router NVRAM usage of <b>${2}%%</b> exceeds <b>${nvramUsedThresholdTestOnly}%%</b>.\n"
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
@@ -865,7 +968,7 @@ _CreateEMailContent_()
            emailSubject="Router TMPFS Usage [TESTING]"
            emailBodyTitle="TMPFS Usage: ${2}%"
            {
-             printf "This notification is for <b>*TESTING*</b> purposes ONLY.\n\n"
+             printf "This notification is for <b>*TESTING*</b> PURPOSES ONLY.\n\n"
              printf "Router TMPFS usage of <b>${2}%%</b> exceeds <b>${tmpfsUsedThresholdTestOnly}%%</b>.\n"
              printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
              printf "\n%s\n" "$3"
@@ -983,10 +1086,11 @@ _SendEMailNotification_()
 {
    if [ -z "${amtmIsEMailConfigFileEnabled:+xSETx}" ]
    then
-       logTag="**ERROR**_${scriptFileName}_$$"
+       logTag="**WARNING**_${scriptFileName}_[$$]"
        logMsg="Email library script [$CUSTOM_EMAIL_LIB_SCRIPT_FNAME] *NOT* FOUND."
-       /usr/bin/logger -t "$logTag" "$logMsg"
+       _MsgToSysLog_ "$logMsg" WARN
        _PrintMsg_ "\n%s: %s\n\n" "$logTag" "$logMsg"
+       _WaitForEnterKey_
        return 1
    fi
 
@@ -1011,9 +1115,10 @@ _SendEMailNotification_()
        logMsg="The email notification was sent successfully [$1]."
    else
        logTag="**ERROR**:"
-       logMsg="Failure to send email notification [Error Code: $retCode][$1]."
+       logMsg="Failure to send email notification [Error Code: $retCode] [$1]."
    fi
    _PrintMsg_ "\n${logTag} ${logMsg}\n"
+   [ "$retCode" -ne 0 ] && _WaitForEnterKey_
 
    [ -f "$tmpEMailBodyFile" ] && rm -f "$tmpEMailBodyFile"
    return "$retCode"
@@ -1146,57 +1251,69 @@ _JFFS_ShowUsageNotification_()
    if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
    then return 1 ; fi
 
-   local logMsg  theUsageThreshold
+   local logMsg  alertMsg  usageThreshold  forTestOnly=false
 
    case "$1" in
        JFFS_NOT_MOUNTED)
+           alertMsg="JFFS partition is *NOT* found mounted."
            {
-             printf "\n**ALERT**\n"
-             printf "JFFS partition is NOT found mounted.\n"
+              printf "\n**ALERT**\n${alertMsg}\n"
            } >> "$tempLogFPath"
+           _MsgToSysLog_ "$alertMsg" ALERT
            return 0
            ;;
        JFFS_READ_ONLY)
+           alertMsg="JFFS partition is mounted READ-ONLY."
            {
-             printf "\n**ALERT**\n"
-             printf "JFFS partition is mounted READ-ONLY.\n"
+              printf "\n**ALERT**\n${alertMsg}\n"
            } >> "$tempLogFPath"
+           _MsgToSysLog_ "$alertMsg" ALERT
            return 0
            ;;
        JFFS_USED_TestOnly)
-           theUsageThreshold="$jffsUsedThresholdTestOnly"
-           logMsg="This notification is for **TESTING** purposes ONLY."
+           forTestOnly=true
+           usageThreshold="$jffsUsedThresholdTestOnly"
+           logMsg="This notification is for **TESTING** PURPOSES ONLY:"
            ;;
        JFFS_USED_Warning1)
-           theUsageThreshold="$jffsUsedThresholdWarning1"
+           usageThreshold="$jffsUsedThresholdWarning1"
            logMsg="**WARNING**"
            ;;
        JFFS_USED_Warning2)
-           theUsageThreshold="$jffsUsedThresholdWarning2"
+           usageThreshold="$jffsUsedThresholdWarning2"
            logMsg="**WARNING**"
            ;;
        JFFS_USED_RedAlert1)
-           theUsageThreshold="$jffsUsedThresholdRedAlert1"
+           usageThreshold="$jffsUsedThresholdRedAlert1"
            logMsg="**ALERT**"
            ;;
        JFFS_USED_RedAlert2)
-           theUsageThreshold="$jffsUsedThresholdRedAlert2"
+           usageThreshold="$jffsUsedThresholdRedAlert2"
            logMsg="**ALERT**"
            ;;
        JFFS_USED_RedAlert3)
-           theUsageThreshold="$jffsUsedThresholdRedAlert3"
+           usageThreshold="$jffsUsedThresholdRedAlert3"
            logMsg="**ALERT**"
            ;;
        *) _PrintMsg_ "\n**ERROR**: UNKNOWN JFFS Usage Parameter [$1]\n"
            return 1
            ;;
    esac
+
+   alertMsg="JFFS usage of ${2}% exceeds ${usageThreshold}%."
    {
-     printf "\n${logMsg}\n"
-     printf "JFFS usage of ${2}%% exceeds ${theUsageThreshold}%%."
-     printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
-     printf "\n%s\n" "$3"
+      printf "\n${logMsg}\n"
+      "$forTestOnly" && \
+      printf "---------------------------------------------------\n"
+      printf "%s\n" "$alertMsg"
+      printf "%s\n" "$(df -hT | head -n1)"
+      printf "%s\n" "$3"
    } >> "$tempLogFPath"
+
+   _MsgToSysLog_ "$alertMsg" ALERT
+   "$forTestOnly" && logMsg="**TESTING** ONLY"
+   _MsgToSysLog_ "${logMsg}: [$3]" ALERT
+
    return 0
 }
 
@@ -1299,49 +1416,61 @@ _NVRAM_ShowUsageNotification_()
    if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
    then return 1 ; fi
 
-   local logMsg  theUsageThreshold
+   local logMsg  alertMsg  usageThreshold  usageInfo  forTestOnly=false
 
    case "$1" in
        NVRAM_NOT_FOUND)
+           alertMsg="NVRAM was NOT found."
            {
-             printf "\n**ALERT**\n"
-             printf "NVRAM was NOT found.\n"
+              printf "\n**ALERT**\n${alertMsg}\n"
            } >> "$tempLogFPath"
+           _MsgToSysLog_ "$alertMsg" ALERT
            return 0
            ;;
        NVRAM_USED_TestOnly)
-           theUsageThreshold="$nvramUsedThresholdTestOnly"
-           logMsg="This notification is for **TESTING** purposes ONLY."
+           forTestOnly=true
+           usageThreshold="$nvramUsedThresholdTestOnly"
+           logMsg="This notification is for **TESTING** PURPOSES ONLY:"
            ;;
        NVRAM_USED_Warning1)
-           theUsageThreshold="$nvramUsedThresholdWarning1"
+           usageThreshold="$nvramUsedThresholdWarning1"
            logMsg="**WARNING**"
            ;;
        NVRAM_USED_Warning2)
-           theUsageThreshold="$nvramUsedThresholdWarning2"
+           usageThreshold="$nvramUsedThresholdWarning2"
            logMsg="**WARNING**"
            ;;
        NVRAM_USED_RedAlert1)
-           theUsageThreshold="$nvramUsedThresholdRedAlert1"
+           usageThreshold="$nvramUsedThresholdRedAlert1"
            logMsg="**ALERT**"
            ;;
        NVRAM_USED_RedAlert2)
-           theUsageThreshold="$nvramUsedThresholdRedAlert2"
+           usageThreshold="$nvramUsedThresholdRedAlert2"
            logMsg="**ALERT**"
            ;;
        NVRAM_USED_RedAlert3)
-           theUsageThreshold="$nvramUsedThresholdRedAlert3"
+           usageThreshold="$nvramUsedThresholdRedAlert3"
            logMsg="**ALERT**"
            ;;
        *) _PrintMsg_ "\n**ERROR**: UNKNOWN NVRAM Usage Parameter [$1]\n"
            return 1
            ;;
    esac
+
+   alertMsg="NVRAM usage of ${2}% exceeds ${usageThreshold}%."
    {
-     printf "\n${logMsg}\n"
-     printf "NVRAM usage of ${2}%% exceeds ${theUsageThreshold}%%."
-     printf "\n%s\n" "$3"
+      printf "\n${logMsg}\n"
+      "$forTestOnly" && \
+      printf "---------------------------------------------------\n"
+      printf "%s" "$alertMsg"
+      printf "\n%s\n" "$3"
    } >> "$tempLogFPath"
+
+   _MsgToSysLog_ "$alertMsg" ALERT
+   "$forTestOnly" && logMsg="**TESTING** ONLY"
+   usageInfo="$(echo "$3" | grep -E '^NVRAM Used:')"
+   _MsgToSysLog_ "${logMsg}: [$usageInfo]" ALERT
+
    return 0
 }
 
@@ -1444,43 +1573,53 @@ _TMPFS_ShowUsageNotification_()
    if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
    then return 1 ; fi
 
-   local logMsg  theUsageThreshold
+   local logMsg  alertMsg  usageThreshold  forTestOnly=false
 
    case "$1" in
        TMPFS_USED_TestOnly)
-           theUsageThreshold="$tmpfsUsedThresholdTestOnly"
-           logMsg="This notification is for **TESTING** purposes ONLY."
+           forTestOnly=true
+           usageThreshold="$tmpfsUsedThresholdTestOnly"
+           logMsg="This notification is for **TESTING** PURPOSES ONLY:"
            ;;
        TMPFS_USED_Warning1)
-           theUsageThreshold="$tmpfsUsedThresholdWarning1"
+           usageThreshold="$tmpfsUsedThresholdWarning1"
            logMsg="**WARNING**"
            ;;
        TMPFS_USED_Warning2)
-           theUsageThreshold="$tmpfsUsedThresholdWarning2"
+           usageThreshold="$tmpfsUsedThresholdWarning2"
            logMsg="**WARNING**"
            ;;
        TMPFS_USED_RedAlert1)
-           theUsageThreshold="$tmpfsUsedThresholdRedAlert1"
+           usageThreshold="$tmpfsUsedThresholdRedAlert1"
            logMsg="**ALERT**"
            ;;
        TMPFS_USED_RedAlert2)
-           theUsageThreshold="$tmpfsUsedThresholdRedAlert2"
+           usageThreshold="$tmpfsUsedThresholdRedAlert2"
            logMsg="**ALERT**"
            ;;
        TMPFS_USED_RedAlert3)
-           theUsageThreshold="$tmpfsUsedThresholdRedAlert3"
+           usageThreshold="$tmpfsUsedThresholdRedAlert3"
            logMsg="**ALERT**"
            ;;
        *) _PrintMsg_ "\n**ERROR**: UNKNOWN TMPFS Usage Parameter [$1]\n"
            return 1
            ;;
    esac
+
+   alertMsg="TMPFS usage of ${2}% exceeds ${usageThreshold}%."
    {
-     printf "\n${logMsg}\n"
-     printf "TMPFS usage of ${2}%% exceeds ${theUsageThreshold}%%."
-     printf "\n%s" "$(df -hT | grep -E "^Filesystem[[:blank:]]+")"
-     printf "\n%s\n" "$3"
+      printf "\n${logMsg}\n"
+      "$forTestOnly" && \
+      printf "---------------------------------------------------\n"
+      printf "%s\n" "$alertMsg"
+      printf "%s\n" "$(df -hT | head -n1)"
+      printf "%s\n" "$3"
    } >> "$tempLogFPath"
+
+   _MsgToSysLog_ "$alertMsg" ALERT
+   "$forTestOnly" && logMsg="**TESTING** ONLY"
+   _MsgToSysLog_ "${logMsg}: [$3]" ALERT
+
    return 0
 }
 
@@ -1564,13 +1703,14 @@ _CPU_ShowTemperatureNotification_()
 {
    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
    then return 1 ; fi
-   
-   local logMsg  cpuThermalThreshold
+
+   local logMsg  alertMsg  cpuThermalThreshold  forTestOnly=false
 
    case "$1" in
        CPU_TEMP_TestOnly)
+           forTestOnly=true
            cpuThermalThreshold="$cpuThermalThresholdTestOnly"
-           logMsg="This notification is for **TESTING** purposes ONLY."
+           logMsg="This notification is for **TESTING** PURPOSES ONLY:"
            ;;
        CPU_TEMP_Warning1)
            cpuThermalThreshold="$cpuThermalThresholdWarning1"
@@ -1592,17 +1732,26 @@ _CPU_ShowTemperatureNotification_()
            return 1
            ;;
    esac
+
+   alertMsg="CPU temperature of ${2}°C exceeds ${cpuThermalThreshold}°C."
    {
-     printf "\n${logMsg}\n"
-     printf "CPU temperature of ${2}°C exceeds ${cpuThermalThreshold}°C.\n"
+      printf "\n${logMsg}\n"
+      "$forTestOnly" && \
+      printf "---------------------------------------------------\n"
+      printf "%s\n" "$alertMsg"
    } >> "$tempLogFPath"
+
+   _MsgToSysLog_ "$alertMsg" ALERT
+   "$forTestOnly" && logMsg="**TESTING** ONLY"
+   _MsgToSysLog_ "${logMsg}: [CPU temperature ${2}°C]" ALERT
+
    return 0
 }
 
 #-----------------------------------------------------------------------#
 _CheckTemperatureThresholds_CPU_()
 {
-   if ! echo "$cpuTemperatureCelsius" | grep -qE '^[1-9][0-9]?[.]?[0-9]+$'
+   if ! echo "$cpuTemperatureCelsius" | grep -qE '^[1-9][0-9]*[.]?[0-9]+$'
    then return 1 ; fi
 
    _GetIntgr_() { printf "%.0f" "$(echo "$1" | awk "{print $1}")" ; }
@@ -1697,6 +1846,176 @@ _CPU_Temperature_()
    return 1
 }
 
+#-----------------------------------------------------------------------#
+_CompareNums_()
+{
+    if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || \
+       ! echo "$1" | grep -qE "^${xNumberRegExp}$" || \
+       ! echo "$3" | grep -qE "^${xNumberRegExp}$" || \
+       ! echo "$2" | grep -qE "^(-eq|-lt|-gt|-le|-ge)$"
+    then
+        _PrintMsg_ "\n**ERROR**: INVALID or EMPTY parameter [$*]\n\n"
+        return 1
+    fi
+
+    case "$2" in
+        -eq) if awk -v num1="$1" -v num2="$3" 'BEGIN {exit !(num1 == num2)}'
+             then return 0 ; else return 1 ; fi
+             ;;
+        -lt) if awk -v num1="$1" -v num2="$3" 'BEGIN {exit !(num1 < num2)}'
+             then return 0 ; else return 1 ; fi
+             ;;
+        -gt) if awk -v num1="$1" -v num2="$3" 'BEGIN {exit !(num1 > num2)}'
+             then return 0 ; else return 1 ; fi
+             ;;
+        -le) if awk -v num1="$1" -v num2="$3" 'BEGIN {exit !(num1 <= num2)}'
+             then return 0 ; else return 1 ; fi
+             ;;
+        -ge) if awk -v num1="$1" -v num2="$3" 'BEGIN {exit !(num1 >= num2)}'
+             then return 0 ; else return 1 ; fi
+             ;;
+    esac
+}
+
+#-----------------------------------------------------------------------#
+_SetMaxLogFileSize_()
+{
+    if [ $# -eq 0 ] || [ -z "$1" ] || \
+       ! echo "$1" | grep -qE "^${xNumberRegExp}$" || \
+       _CompareNums_ "$1" -lt "$MIN_LogFileSizeMB" || \
+       _CompareNums_ "$1" -gt "$MAX_LogFileSizeMB"
+    then
+        _PrintMsg_ "\n**ERROR**: INVALID or EMPTY parameter [$*]\n"
+        _PrintMsg_ "VALID values: $MIN_LogFileSizeMB to ${MAX_LogFileSizeMB} MBytes.\n\n"
+        return 1
+    fi
+    local sizeValueKB
+    _GetIntgr_() { printf "%.0f" "$(echo "$1" | awk "{print $1}")" ; }
+    sizeValueKB="$(_GetIntgr_ "($1 * 1024)")"
+    _SetConfigurationOption_ maxLogFileSizeKB "$sizeValueKB"
+    return 0
+}
+
+#-----------------------------------------------------------------------#
+_RemoveCronJobSetup_()
+{
+    local theCRU_Tag="#${CRON_Tag}#"
+
+    if eval $cronListCmd | grep -qE "/.*/$scriptFileName ${theCRU_Tag}$"
+    then
+        $CRU_Cmd d "$CRON_Tag"
+        sleep 1
+        if ! eval $cronListCmd | grep -qE " ${theCRU_Tag}$"
+        then
+            _PrintMsg_ "\nExisting CRON Job [$theCRU_Tag] was DELETED.\n\n"
+        else
+            _PrintMsg_ "\nExisting CRON Job [$theCRU_Tag] *NOT* deleted.\n\n"
+        fi
+    else
+        _PrintMsg_ "\nCRON Job [$theCRU_Tag] *NOT* found.\n\n"
+    fi
+}
+
+#-----------------------------------------------------------------------#
+_SetUpCronJob_()
+{
+    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]       || \
+       ! echo "$2" | grep -qE "^(${cronHourRegExp1}|[*])$" || \
+       ! echo "$1" | grep -qE "^(${cronMinsRegExp0}|${cronMinsRegExp1})$"
+    then
+        _PrintMsg_ "\n**ERROR**: INVALID parameters [$*]\n\n"
+        return 1
+    fi
+    local cronHour="*"  cronMins="$cronDefaultMins"
+    local theCRU_Tag="#${CRON_Tag}#"  setCRONjob  cronJobStr
+    local cronSchedule  cronJobFPath  cronTagStrng  cronTagName
+
+    if [ "$1" -lt 6 ]
+    then cronMins="$1"
+    elif [ "$1" -lt 60 ]
+    then cronMins="*/$1"
+    fi
+    if [ "$2" = "24" ]
+    then cronHour="$cronDefaultHour"
+    elif [ "$2" != "*" ] && [ "$2" -ne 1 ]
+    then cronHour="*/$2"
+    fi
+
+    setCRONjob=false
+    cronJobStr="$(eval $cronListCmd | grep -E " /.*/$scriptFileName ")"
+
+    if [ -n "$cronJobStr" ]
+    then
+        cronTagStrng="$(echo "$cronJobStr" | awk -F ' ' '{print $NF}')"
+        cronJobFPath="$(echo "$cronJobStr" | awk -F ' ' '{print $(NF-1)}')"
+        cronSchedule="$(echo "$cronJobStr" | awk -F ' ' '{print $1, $2, $3, $4, $5}')"
+
+        if [ "$cronTagStrng" != "$theCRU_Tag" ]    || \
+           [ "$cronJobFPath" != "$scriptFilePath" ] || \
+           [ "$cronSchedule" != "$cronMins $cronHour * * *" ]
+        then
+            cronTagName="$(echo "$cronTagStrng" | sed "s/#//g")"
+            $CRU_Cmd d "$cronTagName"
+            sleep 1
+            if ! eval $cronListCmd | grep -qE " ${cronTagStrng}$"
+            then
+                setCRONjob=true
+                _PrintMsg_ "\nExisting CRON Job [$cronTagStrng] was DELETED.\n"
+            else
+                _PrintMsg_ "\nExisting CRON Job [$theCRU_Tag] *NOT* deleted.\n\n"
+            fi
+        else
+            _PrintMsg_ "\nThe CRON Job [$cronTagStrng] is already FOUND.\n"
+            _PrintMsg_ "CRON: [$cronJobStr]\n\n"
+        fi
+    else
+        _PrintMsg_ "\n"
+    fi
+
+    if "$setCRONjob" || [ -z "$cronJobStr" ]
+    then
+        $CRU_Cmd a "$CRON_Tag" "$cronMins $cronHour * * * $scriptFilePath"
+        sleep 1
+        cronJobStr="$(eval $cronListCmd | grep -E " $scriptFilePath ${theCRU_Tag}$")"
+        if [ -n "$cronJobStr" ]
+        then
+            _PrintMsg_ "New CRON Job [$theCRU_Tag] was CREATED.\n"
+            _PrintMsg_ "CRON: [$cronJobStr]\n\n"
+        else
+            _PrintMsg_ "\n**ERROR**: CANNOT create new CRON Job [$theCRU_Tag]\n\n"
+        fi
+    fi
+}
+
+#-----------------------------------------------------------------------#
+_CheckForCronJobSetup_()
+{
+    local cronMins  cronHour
+
+    if [ $# -eq 0 ] || [ -z "$1" ]
+    then
+        _SetUpCronJob_ 20 "*"  #DEFAULT: Every 20 minutes#
+        return "$?"
+    fi
+    if echo "$1" | grep -qE "^${cronMinsRegExp2}$"
+    then
+        cronMins="$(echo "$1" | sed 's/mins//')"
+        _SetUpCronJob_ "$cronMins" "*"
+        return "$?"
+    fi
+    if echo "$1" | grep -qE "^${cronHourRegExp2}$"
+    then
+        cronHour="$(echo "$1" | sed 's/hour//')"
+        _SetUpCronJob_ "$cronDefaultMins" "$cronHour"
+        return "$?"
+    fi
+
+    _PrintMsg_ "\n**ERROR**: INVALID parameter [$1]\n"
+    _PrintMsg_ "\nVALID parameters:\n"
+    _PrintMsg_ "${cronValidMins}\n${cronValidHour}\n\n"
+    return 1
+}
+
 quietArg=""
 updateArg=""
 
@@ -1706,24 +2025,30 @@ do
        "-verbose" | "-quiet" | "-veryquiet")
           quietArg="$PARAM"
           ;;
-       -versionCheck)
+       -versioncheck)
           updateArg="$PARAM"
           ;;
        *) ;; #CONTINUE#
    esac
 done
 
-if [ "$updateArg" = "-versionCheck" ]
+if [ "$updateArg" = "-versioncheck" ]
 then
     _CheckForScriptUpdates_ "$(pwd)" "$quietArg"
     exit $?
 fi
 
 numVal=0
-numProcs=10
+numProcs=15
+duUnits="HR"
 downloadHelper=false
 readonly routerMODEL_ID="$(_GetRouterModelID_)"
 readonly routerFWversion="$(_GetCurrentFWVersion_)"
+
+if [ "$SCRIPT_BRANCH" = "master" ]
+then scriptVersInfo="$LMS_VERSION"
+else scriptVersInfo="${LMS_VERSION}_${LMS_VERSTAG}"
+fi
 
 _CheckConfigurationFile_
 _ValidateLogDirPath_ "$userLogDirectoryPath" "$prefLogDirectoryPath" "$altLogDirectoryPath"
@@ -1738,7 +2063,7 @@ then
            then
                numProcs="$numVal"
            else
-               _PrintMsg_ "\n\n*ERROR**: INVALID parameter value [$numVal]\n\n"
+               _PrintMsg_ "\n\n*ERROR**: INVALID parameter [$numVal]\n\n"
                exit 1
            fi
            ;;
@@ -1752,16 +2077,37 @@ then
            ;;
         -enableEmailNotification)
            _SetConfigurationOption_ isSendEmailNotificationsEnabled true
+           exit 0
            ;;
         -disableEmailNotification)
            _SetConfigurationOption_ isSendEmailNotificationsEnabled false
+           exit 0
            ;;
         -download)
            if [ $# -gt 1 ] && [ "$2" = "-cemdlhelper" ]
            then downloadHelper=true ; fi
            ;;
-        *) _PrintMsg_ "\n\n*ERROR**: UNKNOWN parameter [$1]\n\n"
-           exit 1
+        -maxlogsize)
+           shift ; _SetMaxLogFileSize_ "$@"
+           exit 0
+           ;;
+        -setcronjob)
+           shift ; _CheckForCronJobSetup_ "$@"
+           exit 0
+           ;;
+        -delcronjob)
+           _RemoveCronJobSetup_
+           exit 0
+           ;;
+        -help|help)
+           _ShowUsage_ ; exit 0
+           ;;
+        kb|KB|mb|MB)
+           duUnits="$1"
+           ;;
+        *) _PrintMsg_ "\n*ERROR**: UNKNOWN parameter [$1]\n"
+           _WaitForEnterKey_
+           _ShowUsage_ ; exit 1
            ;;
     esac
 fi
@@ -1786,7 +2132,8 @@ fi
    echo "=================================="
    date +"%Y-%b-%d, %I:%M:%S %p %Z (%a)"
    printf "Router Model: ${routerMODEL_ID}\n"
-   printf "F/W Installed: ${routerFWversion}\n\n"
+   printf "F/W Installed: ${routerFWversion}\n"
+   printf "Script Version: $scriptVersInfo $branchStr_TAG\n\n"
    printf "Uptime\n------\n" ; uptime ; echo
    _CPU_Temperature_ ; echo
    printf "free:\n" ; free ; echo
@@ -1795,24 +2142,24 @@ fi
    df -hT | grep -E '(/jffs$|/tmp$|/var$)' | sort -d -t ' ' -k 7
    _Show_JFFS_Usage_
    _Show_NVRAM_Usage_
-   case "$units" in
+   case "$duUnits" in
        kb|KB) printf "KBytes [du /tmp/]\n-----------------\n"
-              _InfoKBdu_ "/tmp" 15
+              _InfoKBdu_ "/tmp" 25
               echo
               printf "KBytes [du /jffs]\n-----------------\n"
-              _InfoKBdu_ "/jffs" 15
+              _InfoKBdu_ "/jffs" 25
               ;;
        mb|MB) printf "MBytes [du /tmp/]\n-----------------\n"
-              _InfoMBdu_ "/tmp" 15
+              _InfoMBdu_ "/tmp" 25
               echo
               printf "MBytes [du /jffs]\n-----------------\n"
-              _InfoMBdu_ "/jffs" 15
+              _InfoMBdu_ "/jffs" 25
               ;;
        hr|HR) printf "[du /tmp/]\n----------\n"
-              _InfoHRdu_ "/tmp" 15
+              _InfoHRdu_ "/tmp" 25
               echo
               printf "[du /jffs]\n----------\n"
-              _InfoHRdu_ "/jffs" 15
+              _InfoHRdu_ "/jffs" 25
              ;;
    esac
    echo
