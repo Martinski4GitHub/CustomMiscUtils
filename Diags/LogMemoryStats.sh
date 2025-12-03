@@ -54,13 +54,13 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2025-Nov-29 [Martinski W.]
+# Last Modified: 2025-Dec-03 [Martinski W.]
 #########################################################################
 set -u
 
-readonly LMS_VERSION="0.7.13"
+readonly LMS_VERSION="0.7.14"
 readonly LMS_VERFILE="lmsVersion.txt"
-readonly LMS_VERSTAG="25112912"
+readonly LMS_VERSTAG="25120300"
 
 readonly SCRIPT_BRANCH="master"
 readonly LMS_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
@@ -112,6 +112,7 @@ fi
 # Make sure to set the log directory to a location
 # that survives a reboot so logs are not deleted.
 #-----------------------------------------------------
+readonly HOMEdir="/home/root"
 readonly defLogDirectoryPath="/opt/var/log"
 readonly altLogDirectoryPath="/jffs/scripts/logs"
 
@@ -629,73 +630,6 @@ _CheckConfigurationFile_()
    _InitConfigurationSettings_
 }
 
-#-----------------------------------------------------------------------#
-# CPU Celsius Temperature Thresholds
-# >> 94 = Red Alert Level 3 [6 hrs]
-# >> 92 = Red Alert Level 2 [12 hrs]
-# >> 90 = Red Alert Level 1 [24 hrs]
-# >> 88 = Yellow Warning Level 1 [48 hrs]
-# <= 88 = Green OK
-#-----------------------------------------------------------------------#
-cpuTemperatureCelsius=""
-cpuTempThresholdTestOnly=false
-readonly cpuThermalThresholdTestOnly=10
-readonly cpuThermalThresholdWarning1=88
-readonly cpuThermalThresholdRedAlert1=90
-readonly cpuThermalThresholdRedAlert2=92
-readonly cpuThermalThresholdRedAlert3=94
-
-#-----------------------------------------------------------------------#
-# NVRAM Percent Usage Thresholds
-# >> 97% Used = Red Alert Level 3 [6 hrs]
-# >> 96% Used = Red Alert Level 2 [12 hrs]
-# >> 95% Used = Red Alert Level 1 [24 hrs]
-# >> 93% Used = Yellow Warning Level 2 [36 hrs]
-# >> 90% Used = Yellow Warning Level 1 [48 hrs]
-# <= 90% Used = Green OK
-#-----------------------------------------------------------------------#
-nvramUsageThresholdTestOnly=false
-readonly nvramUsedThresholdTestOnly=10
-readonly nvramUsedThresholdWarning1=90
-readonly nvramUsedThresholdWarning2=93
-readonly nvramUsedThresholdRedAlert1=95
-readonly nvramUsedThresholdRedAlert2=96
-readonly nvramUsedThresholdRedAlert3=97
-
-#-----------------------------------------------------------------------#
-# JFFS Filesystem Percent Usage Thresholds
-# >> 85% Used = Red Alert Level 3 [6 hrs]
-# >> 80% Used = Red Alert Level 2 [12 hrs]
-# >> 75% Used = Red Alert Level 1 [24 hrs]
-# >> 72% Used = Yellow Warning Level 2 [36 hrs]
-# >> 70% Used = Yellow Warning Level 1 [48 hrs]
-# <= 70% Used = Green OK
-#-----------------------------------------------------------------------#
-jffsUsageThresholdTestOnly=false
-readonly jffsUsedThresholdTestOnly=1
-readonly jffsUsedThresholdWarning1=70
-readonly jffsUsedThresholdWarning2=72
-readonly jffsUsedThresholdRedAlert1=75
-readonly jffsUsedThresholdRedAlert2=80
-readonly jffsUsedThresholdRedAlert3=85
-
-#-----------------------------------------------------------------------#
-# "tmpfs" Filesystem Percent Usage Thresholds
-# >> 90% Used = Red Alert Level 3 [6 hrs]
-# >> 85% Used = Red Alert Level 2 [12 hrs]
-# >> 80% Used = Red Alert Level 1 [24 hrs]
-# >> 75% Used = Yellow Warning Level 2 [36 hrs]
-# >> 70% Used = Yellow Warning Level 1 [48 hrs]
-# <= 70% Used = Green OK
-#-----------------------------------------------------------------------#
-tmpfsUsageThresholdTestOnly=false
-readonly tmpfsUsedThresholdTestOnly=0
-readonly tmpfsUsedThresholdWarning1=70
-readonly tmpfsUsedThresholdWarning2=75
-readonly tmpfsUsedThresholdRedAlert1=80
-readonly tmpfsUsedThresholdRedAlert2=85
-readonly tmpfsUsedThresholdRedAlert3=90
-
 #-------------------------------------
 # To send email notifications alerts
 #-------------------------------------
@@ -709,6 +643,77 @@ nvramLastEmailNotificationTime="0_INIT"
 tmpfsEnableEmailNotifications=true
 tmpfsLastEmailNotificationTime="0_INIT"
 isSendEmailNotificationsEnabled=false
+
+#-----------------------------------------------------------------------#
+# CPU Celsius Temperature Thresholds
+# >> 94 = Red Alert Level 3 [4 hrs]
+# >> 92 = Red Alert Level 2 [12 hrs]
+# >> 90 = Red Alert Level 1 [24 hrs]
+# >> 88 = Yellow Warning Level 1 [48 hrs]
+# <= 88 = Green OK
+#-----------------------------------------------------------------------#
+cpuTemperatureCelsius=""
+cpuTempThresholdTestOnly=false
+readonly cpuThermalThresholdTestOnly=10
+readonly cpuThermalThresholdWarning1=88
+readonly cpuThermalThresholdRedAlert1=90
+readonly cpuThermalThresholdRedAlert2=92
+readonly cpuThermalThresholdRedAlert3=94
+readonly cpuTopRedAlertMinHours="$((onehrSecs * 4))"
+
+#-----------------------------------------------------------------------#
+# NVRAM Percent Usage Thresholds
+# >> 97% Used = Red Alert Level 3 [4 hrs]
+# >> 96% Used = Red Alert Level 2 [12 hrs]
+# >> 95% Used = Red Alert Level 1 [24 hrs]
+# >> 93% Used = Yellow Warning Level 2 [36 hrs]
+# >> 90% Used = Yellow Warning Level 1 [48 hrs]
+# <= 90% Used = Green OK
+#-----------------------------------------------------------------------#
+nvramUsageThresholdTestOnly=false
+readonly nvramUsedThresholdTestOnly=10
+readonly nvramUsedThresholdWarning1=90
+readonly nvramUsedThresholdWarning2=93
+readonly nvramUsedThresholdRedAlert1=95
+readonly nvramUsedThresholdRedAlert2=96
+readonly nvramUsedThresholdRedAlert3=97
+readonly nvramTopRedAlertMinHours="$((onehrSecs * 4))"
+
+#-----------------------------------------------------------------------#
+# JFFS Filesystem Percent Usage Thresholds
+# >> 85% Used = Red Alert Level 3 [4 hrs]
+# >> 80% Used = Red Alert Level 2 [12 hrs]
+# >> 75% Used = Red Alert Level 1 [24 hrs]
+# >> 72% Used = Yellow Warning Level 2 [36 hrs]
+# >> 70% Used = Yellow Warning Level 1 [48 hrs]
+# <= 70% Used = Green OK
+#-----------------------------------------------------------------------#
+jffsUsageThresholdTestOnly=false
+readonly jffsUsedThresholdTestOnly=1
+readonly jffsUsedThresholdWarning1=70
+readonly jffsUsedThresholdWarning2=72
+readonly jffsUsedThresholdRedAlert1=75
+readonly jffsUsedThresholdRedAlert2=80
+readonly jffsUsedThresholdRedAlert3=85
+readonly jffsTopRedAlertMinHours="$((onehrSecs * 4))"
+
+#-----------------------------------------------------------------------#
+# "tmpfs" Filesystem Percent Usage Thresholds
+# >> 90% Used = Red Alert Level 3 [4 hrs]
+# >> 85% Used = Red Alert Level 2 [12 hrs]
+# >> 80% Used = Red Alert Level 1 [24 hrs]
+# >> 75% Used = Yellow Warning Level 2 [36 hrs]
+# >> 70% Used = Yellow Warning Level 1 [48 hrs]
+# <= 70% Used = Green OK
+#-----------------------------------------------------------------------#
+tmpfsUsageThresholdTestOnly=false
+readonly tmpfsUsedThresholdTestOnly=0
+readonly tmpfsUsedThresholdWarning1=70
+readonly tmpfsUsedThresholdWarning2=75
+readonly tmpfsUsedThresholdRedAlert1=80
+readonly tmpfsUsedThresholdRedAlert2=85
+readonly tmpfsUsedThresholdRedAlert3=90
+readonly tmpfsTopRedAlertMinHours="$((onehrSecs * 4))"
 
 #-----------------------------------------------------------------------#
 _CreateEMailContent_()
@@ -769,7 +774,7 @@ _CreateEMailContent_()
            ;;
        CPU_TEMP_RedAlert3)
            timeStampID=cpu
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$cpuTopRedAlertMinHours"
            nextTimeStampTag=RED3
            emailSubject="Router CPU Temperature ALERT"
            emailBodyTitle="CPU Temperature: ${2}°C"
@@ -845,7 +850,7 @@ _CreateEMailContent_()
            ;;
        JFFS_USED_RedAlert3)
            timeStampID=jffs
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$jffsTopRedAlertMinHours"
            nextTimeStampTag=RED3
            emailSubject="Router JFFS Usage ALERT"
            emailBodyTitle="JFFS Usage: ${2}%"
@@ -858,7 +863,7 @@ _CreateEMailContent_()
            ;;
        JFFS_NOT_MOUNTED)
            timeStampID=jffs
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$jffsTopRedAlertMinHours"
            nextTimeStampTag=RED4
            emailSubject="Router JFFS NOT Mounted"
            emailBodyTitle="JFFS is *NOT* Mounted"
@@ -869,7 +874,7 @@ _CreateEMailContent_()
            ;;
        JFFS_READ_ONLY)
            timeStampID=jffs
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$jffsTopRedAlertMinHours"
            nextTimeStampTag=RED5
            emailSubject="Router JFFS is READ-ONLY"
            emailBodyTitle="JFFS is READ-ONLY"
@@ -940,7 +945,7 @@ _CreateEMailContent_()
            ;;
        NVRAM_USED_RedAlert3)
            timeStampID=nvram
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$nvramTopRedAlertMinHours"
            nextTimeStampTag=RED3
            emailSubject="Router NVRAM Usage ALERT"
            emailBodyTitle="NVRAM Usage: ${2}%"
@@ -952,7 +957,7 @@ _CreateEMailContent_()
            ;;
        NVRAM_NOT_FOUND)
            timeStampID=nvram
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$nvramTopRedAlertMinHours"
            nextTimeStampTag=RED4
            emailSubject="Router NVRAM NOT Found"
            emailBodyTitle="NVRAM was *NOT* Found"
@@ -1028,7 +1033,7 @@ _CreateEMailContent_()
            ;;
        TMPFS_USED_RedAlert3)
            timeStampID=tmpfs
-           minTimeDiffSecs="$((onehrSecs * 6))"
+           minTimeDiffSecs="$tmpfsTopRedAlertMinHours"
            nextTimeStampTag=RED3
            emailSubject="Router TMPFS Usage ALERT"
            emailBodyTitle="TMPFS Usage: ${2}%"
@@ -1176,7 +1181,7 @@ _NVRAM_GetUsageInfo_()
 _Show_NVRAM_Usage_()
 {
    local tempFile  nvramUsageStr  total  usedx  freex
-   tempFile="${HOME}/nvramUsage.txt"
+   tempFile="${HOMEdir}/nvramUsage.txt"
    nvram show 1>/dev/null 2>"$tempFile"
    nvramUsageStr="$(grep -i "^size:" "$tempFile")"
    rm -f "$tempFile"
@@ -1484,7 +1489,7 @@ _CheckUsageThresholds_NVRAM_()
    local percentNum=0  doConfigUpdate  percentIntgr  percentFloat
    local prevTimeStampStr  prevTimeStampSec  prevTimeStampTag
 
-   tempFile="${HOME}/nvramUsage.txt"
+   tempFile="${HOMEdir}/nvramUsage.txt"
    nvram show 1>/dev/null 2>"$tempFile"
    nvramUsageStr="$(grep -i "^size:" "$tempFile")"
    rm -f "$tempFile"
