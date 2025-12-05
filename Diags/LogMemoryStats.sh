@@ -54,13 +54,13 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2025-Dec-03 [Martinski W.]
+# Last Modified: 2025-Dec-04 [Martinski W.]
 #########################################################################
 set -u
 
-readonly LMS_VERSION="0.7.14"
+readonly LMS_VERSION="0.7.15"
 readonly LMS_VERFILE="lmsVersion.txt"
-readonly LMS_VERSTAG="25120300"
+readonly LMS_VERSTAG="25120420"
 
 readonly SCRIPT_BRANCH="master"
 readonly LMS_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
@@ -72,8 +72,9 @@ readonly scriptLogFName="${scriptFileNTag}.LOG"
 readonly backupLogFName="${scriptFileNTag}.BKP.LOG"
 readonly tempLogFPath="/tmp/var/tmp/${scriptFileNTag}.TMP.LOG"
 readonly duFilterSizeKB=500   #Filter for "du" output#
-readonly CPU_TempProcDMU=/proc/dmu/temperature
-readonly CPU_TempThermal=/sys/devices/virtual/thermal/thermal_zone0/temp
+readonly CPU_Temptr_ProcDMUtemp="/proc/dmu/temperature"
+readonly CPU_Temptr_SysPowerCPU="/sys/power/bpcm/cpu_temp"
+readonly CPU_Temptr_ThermalZone="/sys/devices/virtual/thermal/thermal_zone0/temp"
 
 # Give priority to built-in binaries #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -649,13 +650,13 @@ isSendEmailNotificationsEnabled=false
 # >> 94 = Red Alert Level 3 [4 hrs]
 # >> 92 = Red Alert Level 2 [12 hrs]
 # >> 90 = Red Alert Level 1 [24 hrs]
-# >> 88 = Yellow Warning Level 1 [48 hrs]
-# <= 88 = Green OK
+# >> 89 = Yellow Warning Level 1 [48 hrs]
+# <= 89 = Green OK
 #-----------------------------------------------------------------------#
 cpuTemperatureCelsius=""
 cpuTempThresholdTestOnly=false
 readonly cpuThermalThresholdTestOnly=10
-readonly cpuThermalThresholdWarning1=88
+readonly cpuThermalThresholdWarning1=89
 readonly cpuThermalThresholdRedAlert1=90
 readonly cpuThermalThresholdRedAlert2=92
 readonly cpuThermalThresholdRedAlert3=94
@@ -1812,10 +1813,10 @@ _CheckTemperatureThresholds_CPU_()
 }
 
 #-----------------------------------------------------------------------#
-_Get_CPU_Temp_DMU_()
+_Get_CPU_Temptr_ProcDMUtemp_()
 {
    local rawTemp  charPos3  cpuTemp
-   rawTemp="$(awk -F ' ' '{print $4}' "$CPU_TempProcDMU")"
+   rawTemp="$(awk -F ' ' '{print $4}' "$CPU_Temptr_ProcDMUtemp")"
 
    ## To check for a possible 3-digit value ##
    charPos3="${rawTemp:2:1}"
@@ -1828,24 +1829,40 @@ _Get_CPU_Temp_DMU_()
 }
 
 #-----------------------------------------------------------------------#
-_Get_CPU_Temp_Thermal_()
+_Get_CPU_Temptr_ThermalZone_()
 {
    local rawTemp  cpuTemp
-   rawTemp="$(cat "$CPU_TempThermal")"
+   rawTemp="$(cat "$CPU_Temptr_ThermalZone")"
    cpuTemp="$((rawTemp / 1000)).$(printf "%03d" "$((rawTemp % 1000))")"
    cpuTemperatureCelsius="$cpuTemp"
-   printf "CPU Temperature: $(printf "%.2f" "$cpuTemp")°C\n"
+   printf "CPU Temperature: %.1f°C\n" "$cpuTemp"
+}
+
+#-----------------------------------------------------------------------#
+_Get_CPU_Temptr_SysPowerCPU_()
+{
+   local rawTemp  cpuTemp
+   rawTemp="$(cat "$CPU_Temptr_SysPowerCPU")"
+   cpuTemp="$(echo "$rawTemp" | awk -F' ' '{printf $2}')"
+   cpuTemperatureCelsius="$cpuTemp"
+   printf "CPU Temperature: %.1f°C\n" "$cpuTemp"
 }
 
 #-----------------------------------------------------------------------#
 _CPU_Temperature_()
 {
    cpuTemperatureCelsius=""
-   if [ -f "$CPU_TempProcDMU" ]
-   then _Get_CPU_Temp_DMU_ ; return 0
+   if [ -f "$CPU_Temptr_ProcDMUtemp" ]
+   then
+       _Get_CPU_Temptr_ProcDMUtemp_ ; return 0
    fi
-   if [ -f "$CPU_TempThermal" ]
-   then _Get_CPU_Temp_Thermal_ ; return 0
+   if [ -f "$CPU_Temptr_SysPowerCPU" ]
+   then
+       _Get_CPU_Temptr_SysPowerCPU_ ; return 0
+   fi
+   if [ -f "$CPU_Temptr_ThermalZone" ]
+   then
+       _Get_CPU_Temptr_ThermalZone_ ; return 0
    fi
    printf "\n**ERROR**: CPU Temperature file was *NOT* found.\n"
    return 1
