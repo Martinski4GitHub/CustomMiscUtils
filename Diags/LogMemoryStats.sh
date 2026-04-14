@@ -54,13 +54,13 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2025-Dec-04 [Martinski W.]
+# Last Modified: 2026-Feb-10 [Martinski W.]
 #########################################################################
 set -u
 
-readonly LMS_VERSION="0.7.15"
+readonly LMS_VERSION="0.7.16"
 readonly LMS_VERFILE="lmsVersion.txt"
-readonly LMS_VERSTAG="25120420"
+readonly LMS_VERSTAG="26021020"
 
 readonly SCRIPT_BRANCH="master"
 readonly LMS_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
@@ -246,7 +246,7 @@ _GetCurrentFWVersion_()
 _GetRouterModelID_()
 {
    local retCode=1  routerModelID=""
-   local nvramModelKeys="odmpid wps_modelnum model build_name"
+   local nvramModelKeys="odmpid productid wps_modelnum model build_name"
    for nvramKey in $nvramModelKeys
    do
        routerModelID="$(nvram get "$nvramKey")"
