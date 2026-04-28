@@ -10,13 +10,14 @@
 # ./CheckStuckProcCmds.sh
 # ./CheckStuckProcCmds.sh -help
 # ./CheckStuckProcCmds.sh -setcronjob
-# ./CheckStuckProcCmds.sh -setcronjob=2
+# ./CheckStuckProcCmds.sh -setcronjob=3
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2023-Sep-04 [Martinski W.]
+# Last Modified: 2026-Apr-27 [Martinski W.]
 #
-readonly VERSION=0.7.10
+readonly VERSION=0.7.11
 ######################################################################
+set -u 
 
 #--------------------------------------------#
 # START CUSTOMIZABLE PARAMETERS SECTION.
@@ -31,7 +32,7 @@ TheTRCdir="/opt/var/log/Trace"    # TRACE directory #
 # END CUSTOMIZABLE PARAMETERS SECTION.
 #--------------------------------------------#
 
-set -u
+export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
 
 ScriptFName1="${0##*/}"
 ScriptFName2="${ScriptFName1%.*}"
@@ -114,6 +115,7 @@ SYNTAX: [version $VERSION]
 ./$ScriptFName1 [ help | vers | -setcronjob | -setcronjob=N ]
 
 Where 'N' is the Cron Job run frequency in minutes.
+[Minutes >= 3 && Minutes <= 60]
 
 Current location of log files: [$TheLOGdir]
 Current location of trace files: [$TheTRCdir]
@@ -642,11 +644,19 @@ _StuckProcessCmdsRunning_()
    fi
    _ShowDebugMsg_ "$LogMsg"
 
-   if [ $# -eq 1 ] && [ "$1" = "-ShowMsg" ]
+   if [ "$ProcCount" -gt 0 ] && [ $# -gt 0 ]
    then
-       _AddMsgsToMyLog_ "_ADDnoMARK_" "$LogMsg"
-   elif \
-      [ "$ProcCount" -eq 0 ]
+       if [ "$1" = "-ShowMsgStart" ]
+       then
+           _AddDebugLogMsgs_ "START_$thePID" "[$0]"
+           [ -n "$theLogMsgARGS" ] && \
+           _AddDebugLogMsgs_ "$theLogMsgARGS"
+       fi
+       if echo "$1" | grep -qE "^-ShowMsg"
+       then
+           _AddMsgsToMyLog_ "_ADDnoMARK_" "$LogMsg"
+       fi
+   elif [ "$ProcCount" -eq 0 ]
    then
        _AddMsgsToMyLog_ "_ADDwithMARK_" "$LogMsg"
    fi
@@ -660,7 +670,7 @@ _StuckProcessCmdsRunning_()
 ##################################################################
 _GetStuckProcessCmds_()
 {
-   local ProcState="??"
+   local ProcState="XX"
    ProcEntry1=""  ProcEntryN=""  ProcList=""
    ProcCount="$(eval $FindProcs | grep -cv "$grepExcept0")"
 
@@ -791,6 +801,8 @@ _SaveStuckProcessCmds_()
    return 1
 }
 
+theLogMsgARGS=""
+
 #################################
 # Initial Quick Check & Exit.
 #-------------------------------#
@@ -804,16 +816,14 @@ if ! _LastLogFileLineEmpty_
 then echo >> "$TheLogFile"
 fi
 
-_AddDebugLogMsgs_ "START_$thePID" "[$0]"
-
 if [ -n "$*" ]
-then _AddDebugLogMsgs_ "ARGs_${thePID}: [$*]"
+then theLogMsgARGS="ARGs_${thePID}: [$*]"
 fi
 
 ############################################
 # Check for Stuck Processes (nvram & wl)
 #------------------------------------------#
-if _StuckProcessCmdsRunning_ "-ShowMsg"
+if _StuckProcessCmdsRunning_ "-ShowMsgStart"
 then
    _SaveStuckProcessCmds_
 
@@ -827,12 +837,12 @@ then
       ! _StuckProcessCmdsRunning_ "-ShowMsg"
    then _ResetStuckProcessCmdsFile_
    fi
+
+   _AddDebugLogMsgs_ "EXIT_$thePID"
+   _AddDebugLogMsgs_
 else
    _ResetStuckProcessCmdsFile_
 fi
-
-_AddDebugLogMsgs_ "EXIT_$thePID" "OK."
-_AddDebugLogMsgs_
 
 exit 0
 
