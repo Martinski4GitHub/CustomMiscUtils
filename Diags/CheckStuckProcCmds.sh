@@ -13,9 +13,10 @@
 # ./CheckStuckProcCmds.sh -setcronjob=3
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-Apr-27 [Martinski W.]
+# Last Modified: 2026-Apr-28 [Martinski W.]
 #
 readonly VERSION=0.7.11
+readonly VERSTAG="26042800"
 ######################################################################
 set -u 
 
@@ -110,7 +111,7 @@ _ShowUsage_()
 {
    cat <<EOF
 -----------------------------------------------
-SYNTAX: [version $VERSION]
+SYNTAX: [version ${VERSION}_${VERSTAG}]
 
 ./$ScriptFName1 [ help | vers | -setcronjob | -setcronjob=N ]
 
@@ -644,18 +645,16 @@ _StuckProcessCmdsRunning_()
    fi
    _ShowDebugMsg_ "$LogMsg"
 
-   if [ "$ProcCount" -gt 0 ] && [ $# -gt 0 ]
+   if [ $# -gt 0 ] && echo "$1" | grep -qE "^-ShowMsg"
    then
-       if [ "$1" = "-ShowMsgStart" ]
+       if [ "$ProcCount" -gt 0 ] && \
+          [ "$1" = "-ShowMsgStart" ]
        then
            _AddDebugLogMsgs_ "START_$thePID" "[$0]"
            [ -n "$theLogMsgARGS" ] && \
            _AddDebugLogMsgs_ "$theLogMsgARGS"
        fi
-       if echo "$1" | grep -qE "^-ShowMsg"
-       then
-           _AddMsgsToMyLog_ "_ADDnoMARK_" "$LogMsg"
-       fi
+       _AddMsgsToMyLog_ "_ADDnoMARK_" "$LogMsg"
    elif [ "$ProcCount" -eq 0 ]
    then
        _AddMsgsToMyLog_ "_ADDwithMARK_" "$LogMsg"
