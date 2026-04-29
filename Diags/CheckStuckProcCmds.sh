@@ -1,6 +1,7 @@
 #!/bin/sh
 ######################################################################
 # CheckStuckProcCmds.sh
+#
 # To monitor & check if any 'nvram' or 'wl' commands are running
 # and see if there's a hang during execution of such commands.
 # When such a "stuck" command is found, this script also kills
@@ -11,12 +12,13 @@
 # ./CheckStuckProcCmds.sh -help
 # ./CheckStuckProcCmds.sh -setcronjob
 # ./CheckStuckProcCmds.sh -setcronjob=3
+# ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
 # Last Modified: 2026-Apr-28 [Martinski W.]
 #
-readonly VERSION=0.7.11
-readonly VERSTAG="26042800"
+readonly SCRIPT_VERSION="0.7.12"
+readonly SCRIPT_VERSTAG="26042822"
 ######################################################################
 set -u 
 
@@ -39,6 +41,10 @@ ScriptFName1="${0##*/}"
 ScriptFName2="${ScriptFName1%.*}"
 ScriptFolder="$(/usr/bin/dirname "$0")"
 readonly thePID="$(printf "%05d" "$$")"
+
+readonly SCRIPT_FNAME="CheckStuckProcCmds.sh"
+readonly SCRIPT_BRANCH="master"
+readonly SCRIPT_URL_GH="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
 
 DoMyLogger=1
 ShowDebugMsgs=0
@@ -68,8 +74,8 @@ readonly MaxLogSize=$_25KBytes
 TheLOGtag=""
 TheBKPtag="_BKP"
 SetBKPLogFile=1
-readonly DEF_LOG_Dir=/tmp/var/tmp
-readonly DEF_TRC_Dir=/tmp/var/tmp
+readonly DEF_LOG_Dir="/tmp/var/tmp"
+readonly DEF_TRC_Dir="/tmp/var/tmp"
 
 [ ! -d "$TheLOGdir" ] && mkdir "$TheLOGdir" 2>/dev/null
 [ ! -d "$TheTRCdir" ] && mkdir "$TheTRCdir" 2>/dev/null
@@ -111,11 +117,11 @@ _ShowUsage_()
 {
    cat <<EOF
 -----------------------------------------------
-SYNTAX: [version ${VERSION}_${VERSTAG}]
+SYNTAX: [version ${SCRIPT_VERSION}_${SCRIPT_VERSTAG}]
 
-./$ScriptFName1 [ help | vers | -setcronjob | -setcronjob=N ]
+./$ScriptFName1 [ help | vers | -setcronjob | -setcronjob=N | -checkupdate ]
 
-Where 'N' is the Cron Job run frequency in minutes.
+Where 'N' is the CRON Job run frequency in minutes.
 [Minutes >= 3 && Minutes <= 60]
 
 Current location of log files: [$TheLOGdir]
@@ -133,30 +139,24 @@ To run & check for any "stuck" 'nvram' or 'wl' commands:
 To get this usage & syntax description:
    ./$ScriptFName1 help
 
-To create a Cron Job to run every 6 minutes [the default]:
+To show current script version:
+   ./$ScriptFName1 vers
+
+To create a CRON Job to run every 6 minutes [the default]:
    ./$ScriptFName1 -setcronjob
 
-To create a Cron Job to run every 3 minutes [new interval].
+To create a CRON Job to run every 3 minutes [new interval]:
    ./$ScriptFName1 -setcronjob=3
+
+To check for and install the latest script version update:
+   ./$ScriptFName1 -checkupdate
 -----------------------------------------------
 EOF
 }
 
 #################################################################
 _ShowVersion_()
-{ printf "\nVersion: $VERSION\n\n" ; }
-
-if [ $# -gt 0 ] && [ -n "$1" ]
-then
-    case "$1" in
-        -setdelay) sleep $doDelaySecs ;;
-        help|-help) _ShowUsage_ ; exit 0 ;;
-        vers|-vers) _ShowVersion_ ; exit 0 ;;
-        -setcronjob|-setcronjob=[1-9]*) ;; #CONTINUE#
-        *) printf "\n*ERROR*: Unknown Parameter(s): [$*]\n\n"
-           exit 1 ;;
-    esac
-fi
+{ printf "\nVersion: ${SCRIPT_VERSION}\n\n" ; }
 
 #################################################################
 _GetFileSize_()
@@ -227,23 +227,24 @@ _ShowDebugMsg_()
 ################################################################
 _GetLastLineFromFile_()
 {
-   local TheFileSize  TheLastLine=""
+   local theFileSize  theLastLine=""
 
-   if [ $# -eq 1 ] && [ -n "$1" ] && [ -f "$1" ]
+   if [ $# -eq 1 ] && [ -n "$1" ] && [ -s "$1" ]
    then
-      TheFileSize="$(_GetFileSize_ "$1")"
-      if [ "$TheFileSize" -gt 0 ]
-      then TheLastLine="$(tail -n 1 "$1")" ; fi
+      theFileSize="$(_GetFileSize_ "$1")"
+      if [ "$theFileSize" -gt 0 ]
+      then theLastLine="$(tail -n 1 "$1")"
+      fi
    fi
-   echo "$TheLastLine"
+   echo "$theLastLine"
 }
 
 ################################################################
 _LastLogFileLineEmpty_()
 {
-   local TheLastLine=""
-   TheLastLine="$(_GetLastLineFromFile_ "$TheLogFile")"
-   if [ -z "$TheLastLine" ]
+   local theLastLine=""
+   theLastLine="$(_GetLastLineFromFile_ "$TheLogFile")"
+   if [ -z "$theLastLine" ]
    then return 0
    else return 1
    fi
@@ -256,14 +257,14 @@ _EscapeChars_()
 ################################################################
 _DeleteLastLogFileLineMarked_()
 {
-   local MarkedLine=0  LastLine
+   local markedLine=0  theLastLine
 
-   LastLine="$(_GetLastLineFromFile_ "$TheLogFile")"
-   [ -z "$LastLine" ] && return 1
+   theLastLine="$(_GetLastLineFromFile_ "$TheLogFile")"
+   [ -z "$theLastLine" ] && return 1
 
-   MarkedLine="$($echoCMD "$LastLine" | grep -c "$(_EscapeChars_ "$DelMark")$")"
+   markedLine="$($echoCMD "$theLastLine" | grep -c "$(_EscapeChars_ "$DelMark")$")"
 
-   if [ "$MarkedLine" -gt 0 ]
+   if [ "$markedLine" -gt 0 ]
    then sed -i '$d' "$TheLogFile"
    fi
 }
@@ -294,12 +295,11 @@ _AddMsgsToMyLog_()
       [ "$1" = "_ADDnoMARK_" ] || [ "$1" = "_ADDwithMARK_" ]
    then
        local LogMsg="${TimeNow} ${2}"
-
        _DeleteLastLogFileLineMarked_
 
        if [ "$1" = "_ADDnoMARK_" ] || \
           { [ "$HourMinsNow" = "12:00 PM" ] || \
-            [ "$HourMinsNow" = "12:05 PM" ] ; }
+            [ "$HourMinsNow" = "12:07 PM" ] ; }
        then
            ## Output msg WITHOUT being "marked" ##
            echo "$LogMsg" >> "$TheLogFile"
@@ -483,6 +483,64 @@ _ParseCronJobParameter()
    _CheckForCronJobSetup_
 }
 
+##################################################################
+_CheckScriptUpdate_()
+{
+   local dlFileVerStr  scriptMD5  dlTempMD5
+   local theTempFile="${DEF_LOG_Dir}/${SCRIPT_FNAME}.TMP"
+
+   curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
+   "${SCRIPT_URL_GH}/$SCRIPT_FNAME" -o "$theTempFile"
+
+   if [ ! -s "$theTempFile" ] || \
+      grep -Eiq "^404: Not Found" "$theTempFile"
+   then
+       [ -s "$theTempFile" ] && cat "$theTempFile"
+       printf "\n**ERROR**: Could NOT download the latest script file.\n"
+       rm -f "$theTempFile"
+       return 1
+   fi
+
+   chmod 755 "$theTempFile"
+   dlFileVerStr="$(grep -E '^readonly SCRIPT_VERSION=' "$theTempFile")"
+   if [ -z "$dlFileVerStr" ]
+   then
+       printf "\n**ERROR**: Could NOT find the VERSION string.\n"
+       rm -f "$theTempFile"
+       return 1
+   fi
+
+   dlTempMD5="$(md5sum "$theTempFile" | awk -F' ' '{print $1}')"
+   scriptMD5="$(md5sum "${ScriptFolder}/$SCRIPT_FNAME" | awk -F' ' '{print $1}')"
+   dlFileVerStr="$(echo "$dlFileVerStr" | tr -d '"' | cut -d'=' -f2)"
+
+   if [ "$scriptMD5" = "$dlTempMD5" ] && \
+      [ "$dlFileVerStr" = "$SCRIPT_VERSION" ]
+   then
+       printf "\nCurrent script version is the latest available.\n"
+       return 0
+   fi
+
+   printf "\nNew script version update [$dlFileVerStr] available.\n"
+   mv -f "$theTempFile" "${ScriptFolder}/$SCRIPT_FNAME"
+   chmod 755 "${ScriptFolder}/$SCRIPT_FNAME"
+   printf "\nScript has been updated to the latest version [$dlFileVerStr].\n"
+   return 0
+}
+
+if [ $# -gt 0 ] && [ -n "$1" ]
+then
+    case "$1" in
+        -setdelay) sleep $doDelaySecs ;;
+        help|-help) _ShowUsage_ ; exit 0 ;;
+        vers|-vers) _ShowVersion_ ; exit 0 ;;
+        -checkupdate) _CheckScriptUpdate_ ; exit 0 ;;
+        -setcronjob|-setcronjob=[1-9]*) ;; #CONTINUE#
+        *) printf "\n*ERROR*: Unknown Parameter(s): [$*]\n\n"
+           exit 1 ;;
+    esac
+fi
+
 _DoInitMyLogFile_
 
 if [ $# -gt 0 ] && [ -n "$1" ] && \
@@ -508,38 +566,38 @@ readonly FindProcs="top -b -n 1 | $grepSearch0"
 ##################################################################
 _GetTraceFileIndexNumber_()
 {
-   local TraceIndex  NextTraceIndex
+   local traceIndex  nextTraceIndex
 
-   if [ ! -f "$StuckCmdsNDXfile" ]
+   if [ ! -s "$StuckCmdsNDXfile" ]
    then echo "TraceIndex=1" > "$StuckCmdsNDXfile"
    fi
 
-   TraceIndex="$(grep "^TraceIndex=" "$StuckCmdsNDXfile" | awk -F '=' '{print $2}')"
+   traceIndex="$(grep "^TraceIndex=" "$StuckCmdsNDXfile" | awk -F '=' '{print $2}')"
 
-   if [ -z "$TraceIndex" ] || [ "$TraceIndex" -lt 1 ]
-   then TraceIndex=1
+   if [ -z "$traceIndex" ] || [ "$traceIndex" -lt 1 ]
+   then traceIndex=1
    fi
 
-   NextTraceIndex="$(($TraceIndex + 1))"
-   if [ "$NextTraceIndex" -gt "$MaxTraceIndex" ]
-   then NextTraceIndex=1
+   nextTraceIndex="$((traceIndex + 1))"
+   if [ "$nextTraceIndex" -gt "$MaxTraceIndex" ]
+   then nextTraceIndex=1
    fi
 
    echo "## Next Trace File Index ##" > "$StuckCmdsNDXfile"
-   echo "TraceIndex=$NextTraceIndex" >> "$StuckCmdsNDXfile"
+   echo "TraceIndex=$nextTraceIndex" >> "$StuckCmdsNDXfile"
 
-   TraceIndex="$(printf "%05d" "$TraceIndex")"
+   traceIndex="$(printf "%05d" "$traceIndex")"
 
-   echo "$TraceIndex"
+   echo "$traceIndex"
 }
 
 ##################################################################
 _GetTraceFilePath_()
 {
-   local TraceFName  TraceIndex
-   TraceIndex="$(_GetTraceFileIndexNumber_)"
-   TraceFName="${StuckCmdsLOGname}_${TraceIndex}_${thePID}.TRC.txt"
-   echo "${TheTRCdir}/${TraceFName}"
+   local traceFName  traceIndex
+   traceIndex="$(_GetTraceFileIndexNumber_)"
+   traceFName="${StuckCmdsLOGname}_${traceIndex}_${thePID}.TRC.txt"
+   echo "${TheTRCdir}/${traceFName}"
 }
 
 ##################################################################
@@ -547,9 +605,9 @@ _ResetStuckProcessCmdsFile_()
 {
    if [ -f "$StuckCmdsLOGfile" ]
    then
-      local TraceFilePath=""
-      TraceFilePath="$(_GetTraceFilePath_)"
-      cp -fp "$StuckCmdsLOGfile" "$TraceFilePath"
+      local traceFilePath=""
+      traceFilePath="$(_GetTraceFilePath_)"
+      cp -fp "$StuckCmdsLOGfile" "$traceFilePath"
       rm -f "$StuckCmdsLOGfile"
    fi
 }
@@ -574,7 +632,7 @@ _ShowParentProcEntry_()
       then PPID_List="$ProcPPID"
       else
          PPIDfind="$(echo "$PPID_List" | grep -cw "$ProcPPID")"
-         if [ $PPIDfind -eq 0 ]
+         if [ "$PPIDfind" -eq 0 ]
          then PPID_List="$PPID_List $ProcPPID"
          fi
       fi
@@ -604,7 +662,6 @@ EOT
             fi
          fi
       fi
-
       NumCnt="$((NumCnt + 1))"
    done
 
@@ -647,14 +704,20 @@ _StuckProcessCmdsRunning_()
 
    if [ $# -gt 0 ] && echo "$1" | grep -qE "^-ShowMsg"
    then
-       if [ "$ProcCount" -gt 0 ] && \
-          [ "$1" = "-ShowMsgStart" ]
+       if [ "$ProcCount" -gt 0 ]
        then
-           _AddDebugLogMsgs_ "START_$thePID" "[$0]"
-           [ -n "$theLogMsgARGS" ] && \
-           _AddDebugLogMsgs_ "$theLogMsgARGS"
+           if [ "$1" = "-ShowMsgStart" ]
+           then
+               _DeleteLastLogFileLineMarked_
+               if ! _LastLogFileLineEmpty_
+               then echo >> "$TheLogFile"
+               fi
+               _AddDebugLogMsgs_ "START_$thePID" "[$0]"
+               [ -n "$theLogMsgARGS" ] && \
+               _AddDebugLogMsgs_ "$theLogMsgARGS"
+           fi
+           _AddMsgsToMyLog_ "_ADDnoMARK_" "$LogMsg"
        fi
-       _AddMsgsToMyLog_ "_ADDnoMARK_" "$LogMsg"
    elif [ "$ProcCount" -eq 0 ]
    then
        _AddMsgsToMyLog_ "_ADDwithMARK_" "$LogMsg"
@@ -740,9 +803,9 @@ _SaveStuckProcessCmds_()
             cmdState="$(echo "$ProcStrN" | awk -F ' ' '{print $6}')"
             cpuPrcnt="$(echo "$ProcStrN" | awk -F ' ' '{print $10}')"
 
-            NowTimeSecs=$(date +%s -d "${NowTime}")
-            LastTimeSecs=$(date +%s -d "${LastTime}")
-            TimeDiffSecs=$(($NowTimeSecs - $LastTimeSecs))
+            NowTimeSecs="$(date +%s -d "${NowTime}")"
+            LastTimeSecs="$(date +%s -d "${LastTime}")"
+            TimeDiffSecs="$((NowTimeSecs - LastTimeSecs))"
             KillEntryLog="$NowTime ${ProcEntry1} [KILLED]"
 
             if [ "$TimeDiffSecs" -ge "$MaxDiffSecs" ]
@@ -809,10 +872,6 @@ if ! _StuckProcessCmdsRunning_
 then
    _ResetStuckProcessCmdsFile_
    exit 0
-fi
-
-if ! _LastLogFileLineEmpty_
-then echo >> "$TheLogFile"
 fi
 
 if [ -n "$*" ]
