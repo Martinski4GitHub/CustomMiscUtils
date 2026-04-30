@@ -15,10 +15,10 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-Apr-28 [Martinski W.]
+# Last Modified: 2026-Apr-29 [Martinski W.]
 #
 readonly SCRIPT_VERSION="0.7.12"
-readonly SCRIPT_VERSTAG="26042822"
+readonly SCRIPT_VERSTAG="26042922"
 ######################################################################
 set -u 
 
@@ -66,6 +66,12 @@ else
    ScriptFolder="$(pwd)"
    ScriptFPath="$(pwd)/$ScriptFName1"
 fi
+
+readonly NOct="\e[0m"
+readonly REDct="\e[1;31m"
+readonly GRNct="\e[1;32m"
+readonly YLWct="\e[1;33m"
+readonly MGNTct="\e[1;35m"
 
 readonly echoCMD=/bin/echo
 readonly _25KBytes=25600
@@ -115,9 +121,10 @@ readonly DelMark="**=OK=**"
 ##################################################################
 _ShowUsage_()
 {
+   printf "\nVersion: ${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${NOct}\n"
    cat <<EOF
 -----------------------------------------------
-SYNTAX: [version ${SCRIPT_VERSION}_${SCRIPT_VERSTAG}]
+SYNTAX:
 
 ./$ScriptFName1 [ help | vers | -setcronjob | -setcronjob=N | -checkupdate ]
 
@@ -156,7 +163,7 @@ EOF
 
 #################################################################
 _ShowVersion_()
-{ printf "\nVersion: ${SCRIPT_VERSION}\n\n" ; }
+{ printf "\nVersion: ${GRNct}${SCRIPT_VERSION}${NOct}\n\n" ; }
 
 #################################################################
 _GetFileSize_()
@@ -486,7 +493,8 @@ _ParseCronJobParameter()
 ##################################################################
 _CheckScriptUpdate_()
 {
-   local dlFileVerStr  scriptMD5  dlTempMD5
+   local dlVersionStr  dlVersTagStr  scriptMD5  dlTempMD5
+   local scriptFPath="${ScriptFolder}/$SCRIPT_FNAME"
    local theTempFile="${DEF_LOG_Dir}/${SCRIPT_FNAME}.TMP"
 
    curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
@@ -496,35 +504,38 @@ _CheckScriptUpdate_()
       grep -Eiq "^404: Not Found" "$theTempFile"
    then
        [ -s "$theTempFile" ] && cat "$theTempFile"
-       printf "\n**ERROR**: Could NOT download the latest script file.\n"
+       printf "\n${REDct}**ERROR**${NOct}: Could NOT download the latest script file.\n"
        rm -f "$theTempFile"
        return 1
    fi
 
    chmod 755 "$theTempFile"
-   dlFileVerStr="$(grep -E '^readonly SCRIPT_VERSION=' "$theTempFile")"
-   if [ -z "$dlFileVerStr" ]
+   dlVersionStr="$(grep -E '^readonly SCRIPT_VERSION=' "$theTempFile")"
+   dlVersTagStr="$(grep -E '^readonly SCRIPT_VERSTAG=' "$theTempFile")"
+   if [ -z "$dlVersionStr" ] || [ -z "$dlVersTagStr" ]
    then
-       printf "\n**ERROR**: Could NOT find the VERSION string.\n"
+       printf "\n${REDct}**ERROR**${NOct}: Could NOT find the VERSION string.\n"
        rm -f "$theTempFile"
        return 1
    fi
 
-   dlTempMD5="$(md5sum "$theTempFile" | awk -F' ' '{print $1}')"
-   scriptMD5="$(md5sum "${ScriptFolder}/$SCRIPT_FNAME" | awk -F' ' '{print $1}')"
-   dlFileVerStr="$(echo "$dlFileVerStr" | tr -d '"' | cut -d'=' -f2)"
+   dlTempMD5="$(md5sum "$theTempFile" 2>/dev/null | awk -F' ' '{print $1}')"
+   scriptMD5="$(md5sum "$scriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
+   dlVersionStr="$(echo "$dlVersionStr" | tr -d '"' | cut -d'=' -f2)"
+   dlVersTagStr="$(echo "$dlVersTagStr" | tr -d '"' | cut -d'=' -f2)"
 
    if [ "$scriptMD5" = "$dlTempMD5" ] && \
-      [ "$dlFileVerStr" = "$SCRIPT_VERSION" ]
+      [ "$dlVersionStr" = "$SCRIPT_VERSION" ] && \
+      [ "$dlVersTagStr" = "$SCRIPT_VERSTAG" ]
    then
-       printf "\nCurrent script version is the latest available.\n"
+       printf "\nYou have the latest script version [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${NOct}] available.\n\n"
        return 0
    fi
 
-   printf "\nNew script version update [$dlFileVerStr] available.\n"
-   mv -f "$theTempFile" "${ScriptFolder}/$SCRIPT_FNAME"
-   chmod 755 "${ScriptFolder}/$SCRIPT_FNAME"
-   printf "\nScript has been updated to the latest version [$dlFileVerStr].\n"
+   printf "\nLatest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${NOct}] available.\n"
+   mv -f "$theTempFile" "$scriptFPath"
+   chmod 755 "$scriptFPath"
+   printf "Script has been updated to the latest version [${GRNct}${dlVersionStr}_${dlVersTagStr}${NOct}].\n\n"
    return 0
 }
 
@@ -556,12 +567,12 @@ ProcEntry1=""
 ProcEntryN=""
 
 ## Look for 'nvram' or 'wl' commands ##
-readonly grepExcept0="grep -w -E nvram|wl"
-readonly grepSearch0="grep -w -E 'nvram|wl'"
+readonly grepExcept0="grep -wE nvram|wl"
+readonly grepSearch0="grep -wE 'nvram|wl'"
 
 ## Sort PIDs in descending order (from high to low) ##
 readonly SortPIDs="sort -n -r -t ' ' -k 1"
-readonly FindProcs="top -b -n 1 | $grepSearch0"
+readonly FindProcs="top -b -n1 | $grepSearch0"
 
 ##################################################################
 _GetTraceFileIndexNumber_()
@@ -650,7 +661,7 @@ EOT
 
       if [ "$ProcPPID" -gt 1 ] && [ "$PPIDfind" -eq 0 ]
       then
-         ProcEntry="$(top -b -n 1 | grep -w "^[ ]*$ProcPPID")"
+         ProcEntry="$(top -b -n1 | grep -w "^[ ]*$ProcPPID")"
 
          if [ -n "$ProcEntry" ]
          then
