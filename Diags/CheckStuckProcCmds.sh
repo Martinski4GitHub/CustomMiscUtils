@@ -12,13 +12,14 @@
 # ./CheckStuckProcCmds.sh -help
 # ./CheckStuckProcCmds.sh -setcronjob
 # ./CheckStuckProcCmds.sh -setcronjob=3
+# ./CheckStuckProcCmds.sh -delcronjob
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-Apr-29 [Martinski W.]
+# Last Modified: 2026-Apr-30 [Martinski W.]
 #
 readonly SCRIPT_VERSION="0.7.12"
-readonly SCRIPT_VERSTAG="26042922"
+readonly SCRIPT_VERSTAG="26043022"
 ######################################################################
 set -u 
 
@@ -26,7 +27,7 @@ set -u
 # START CUSTOMIZABLE PARAMETERS SECTION.
 #--------------------------------------------#
 # Cron Job default frequency in minutes #
-CRON_Mins=6   #[Mins >= 3 && Mins <= 60]#
+CRON_Mins=6   #[Mins >= 2 && Mins <= 60]#
 
 # Modify these variables as necessary for your environment #
 TheLOGdir="/opt/var/log"          # LOG directory #
@@ -110,7 +111,7 @@ readonly SysLogTimeFormat="%Y-%m-%d %H:%M:%S"
 readonly MyLogTimeFormat="%Y-%b-%d %I:%M:%S %p"
 
 readonly CronMins0RegExp="([0-9]|[1-5][0-9])"
-readonly CronMins1RegExp="[3-6]|10|11|12|15|20|30|60"
+readonly CronMins1RegExp="[2-6]|10|11|12|15|20|30|60"
 readonly CronMins2RegExp="${CronMins0RegExp}(,${CronMins0RegExp})+"
 readonly CronMins3RegExp="${CronMins0RegExp}-${CronMins0RegExp}/${CronMins0RegExp}"
 readonly CronMinsXRegExp="(${CronMins1RegExp}|${CronMins2RegExp}|${CronMins3RegExp})"
@@ -126,10 +127,10 @@ _ShowUsage_()
 -----------------------------------------------
 SYNTAX:
 
-./$ScriptFName1 [ help | vers | -setcronjob | -setcronjob=N | -checkupdate ]
+./$ScriptFName1 [ help | vers | -setcronjob | -setcronjob=N | -delcronjob | -checkupdate ]
 
 Where 'N' is the CRON Job run frequency in minutes.
-[Minutes >= 3 && Minutes <= 60]
+[Minutes >= 2 && Minutes <= 60]
 
 Current location of log files: [$TheLOGdir]
 Current location of trace files: [$TheTRCdir]
@@ -149,11 +150,14 @@ To get this usage & syntax description:
 To show current script version:
    ./$ScriptFName1 vers
 
-To create a CRON Job to run every 6 minutes [the default]:
+To create a CRON Job to run every 6 minutes [DEFAULT]:
    ./$ScriptFName1 -setcronjob
 
 To create a CRON Job to run every 3 minutes [new interval]:
    ./$ScriptFName1 -setcronjob=3
+
+To delete any existing CRON Job:
+   ./$ScriptFName1 -delcronjob
 
 To check for and install the latest script version update:
    ./$ScriptFName1 -checkupdate
@@ -367,16 +371,16 @@ _ValidCronJobMinutes_()
    if [ $# -eq 0 ] || [ -z "$1" ]
    then return 1
    fi
-   local RetCode=1
+   local retCode=1
 
    case "$1" in
        [3-6]|10|11|12|15|20|30|60)
-          RetCode=0 ;;
+          retCode=0 ;;
        *)
           echo "*ERROR*: INVALID number of minutes [$1] for cron job."
-          RetCode=1 ;;
+          retCode=1 ;;
    esac
-   return "$RetCode"
+   return "$retCode"
 }
 
 #################################################################
@@ -385,20 +389,20 @@ _ValidCronJobMinutes_()
 #################################################################
 _GetCronJobList_()
 {
-   local CronJobListFile  CronJobListStr=""
-   local CrobTabsDirPath="/var/spool/cron/crontabs"
+   local cronJobListFile  cronJobListStr=""
+   local cronTabsDirPath="/var/spool/cron/crontabs"
 
-   if [ ! -d "$CrobTabsDirPath" ]
+   if [ ! -d "$cronTabsDirPath" ]
    then echo ; return 1
    fi
 
-   CronJobListFile="$(ls -1 "$CrobTabsDirPath" | grep -vE "cron.[*]*|.*.new$")"
-   if [ -n "$CronJobListFile" ]
+   cronJobListFile="$(ls -1 "$cronTabsDirPath" | grep -vE "cron.[*]*|.*.new$")"
+   if [ -n "$cronJobListFile" ]
    then
-      CronJobListStr="$(cat "${CrobTabsDirPath}/$CronJobListFile")"
+      cronJobListStr="$(cat "${cronTabsDirPath}/$cronJobListFile")"
    fi
 
-   echo "$CronJobListStr"
+   echo "$cronJobListStr"
    return 0
 }
 
@@ -408,8 +412,8 @@ _CheckForCronJobSetup_()
    [ "$CRON_Set" -eq 0 ] && return 1
 
    local theCronMins="*/10"
-   local CronMin=""  CronTag=""  JobPath=""  JobStr=""
-   local CRU_Tag="#${CRON_Tag}#"  SetCRONjob=0
+   local cronMin=""  cronTag=""  jobPath=""  jobStr=""
+   local CRU_Tag="#${CRON_Tag}#"  setCRONjob=false
 
    if [ "$CRON_Mins" = "60" ]
    then theCronMins=0
@@ -418,44 +422,46 @@ _CheckForCronJobSetup_()
    else theCronMins="$CRON_Mins"
    fi
 
-   JobStr="$(_GetCronJobList_ | grep " $ScriptFPath ")"
-   if [ -n "$JobStr" ]
+   jobStr="$(_GetCronJobList_ | grep " $ScriptFPath ")"
+   if [ -n "$jobStr" ]
    then
-      CronMin="$(echo "$JobStr" | awk -F ' ' '{print $1}')"
-      JobPath="$(echo "$JobStr" | awk -F ' ' '{print $6}')"
-      CronTag="$(echo "$JobStr" | awk -F ' ' '{print $7}')"
+      cronMin="$(echo "$jobStr" | awk -F ' ' '{print $1}')"
+      jobPath="$(echo "$jobStr" | awk -F ' ' '{print $6}')"
+      cronTag="$(echo "$jobStr" | awk -F ' ' '{print $7}')"
 
-      if [ "$CronTag" != "$CRU_Tag" ]     || \
-         [ "$CronMin" != "$theCronMins" ] || \
-         [ "$JobPath" != "$ScriptFPath" ]
+      if [ "$cronTag" != "$CRU_Tag" ]    || \
+         [ "$cronMin" != "$theCronMins" ] || \
+         [ "$jobPath" != "$ScriptFPath" ]
       then
-         CronTag="$(echo "$CronTag" | sed "s/#//g")"
-         $CRU_Cmd d "$CronTag"
-         if [ $? -eq 0 ]
+         cronTag="$(echo "$cronTag" | sed "s/#//g")"
+         $CRU_Cmd d "$cronTag" ; sleep 2
+         jobStr="$(_GetCronJobList_ | grep " $ScriptFPath ")"
+         if [ -z "$jobStr" ]
          then
-            sleep 1
-            SetCRONjob=1
-            LogMsg="Previous CRON Job [#${CronTag}#] was DELETED."
-            _AddDebugLogMsgs_ "INFO: $LogMsg"
+             setCRONjob=true
+             LogMsg="Previous CRON Job [#${cronTag}#] was DELETED."
+             _AddDebugLogMsgs_ "INFO: $LogMsg"
+         else
+             printf "CRON Job [#${cronTag}#] was NOT deleted."
          fi
       else
-         LogMsg="The CRON Job [#${CronTag}#] is already FOUND."
+         LogMsg="The CRON Job [#${cronTag}#] is already FOUND."
          _AddDebugLogMsgs_ "INFO: $LogMsg"
-         _AddMsgToMyLogNoTime_ "CRON: [$JobStr]"
+         _AddMsgToMyLogNoTime_ "CRON: [$jobStr]"
       fi
    fi
 
-   if [ -z "$JobStr" ] || [ "$SetCRONjob" -eq 1 ]
+   if [ -z "$jobStr" ] || "$setCRONjob"
    then
       $CRU_Cmd a $CRON_Tag "$theCronMins  *  *  *  *  $ScriptFPath"
       if [ $? -eq 0 ]
       then
          sleep 1
-         JobStr="$(_GetCronJobList_ | grep " $ScriptFPath ")"
+         jobStr="$(_GetCronJobList_ | grep " $ScriptFPath ")"
 
          LogMsg="New CRON Job [$CRU_Tag] was CREATED."
          _AddDebugLogMsgs_ "INFO: $LogMsg"
-         _AddMsgToMyLogNoTime_ "CRON: [$JobStr]"
+         _AddMsgToMyLogNoTime_ "CRON: [$jobStr]"
       else
          LogMsg="CANNOT create new CRON Job [$CRU_Tag]"
          _AddDebugLogMsgs_ "CRON_ERROR: $LogMsg"
@@ -488,6 +494,41 @@ _ParseCronJobParameter()
 
    CRON_Set=1
    _CheckForCronJobSetup_
+}
+
+#################################################################
+_DeleteCronJob_()
+{
+   local jobStrX  jobStrY  cronTag="N/A"
+
+   jobStrX="$(_GetCronJobList_ | grep " $ScriptFPath ")"
+   jobStrY="$(_GetCronJobList_ | grep " #${CRON_Tag}#$")"
+   if [ -z "$jobStrX" ] && [ -z "$jobStrY" ]
+   then
+       printf "\nNo CRON Job was found.\n"
+       return 0
+   fi
+   if [ -n "$jobStrX" ]
+   then
+       cronTag="$(echo "$jobStrX" | awk -F ' ' '{print $7}')"
+       cronTag="$(echo "$cronTag" | sed "s/#//g")"
+       [ -n "$cronTag" ] && $CRU_Cmd d "$cronTag"
+   fi
+   if [ -n "$jobStrY" ] && [ "$CRON_Tag" != "$cronTag" ]
+   then $CRU_Cmd d "$CRON_Tag"
+   fi
+   sleep 2
+
+   jobStrX="$(_GetCronJobList_ | grep " $ScriptFPath ")"
+   jobStrY="$(_GetCronJobList_ | grep " #${CRON_Tag}#$")"
+   if [ -z "$jobStrX" ] && [ -z "$jobStrY" ]
+   then
+       LogMsg="CRON Job was DELETED."
+       _AddDebugLogMsgs_ "INFO: $LogMsg"
+   else
+       printf "CRON Job was NOT deleted."
+   fi
+   return 0
 }
 
 ##################################################################
@@ -545,6 +586,7 @@ then
         -setdelay) sleep $doDelaySecs ;;
         help|-help) _ShowUsage_ ; exit 0 ;;
         vers|-vers) _ShowVersion_ ; exit 0 ;;
+        -delcronjob) _DeleteCronJob_ ; exit 0 ;;
         -checkupdate) _CheckScriptUpdate_ ; exit 0 ;;
         -setcronjob|-setcronjob=[1-9]*) ;; #CONTINUE#
         *) printf "\n*ERROR*: Unknown Parameter(s): [$*]\n\n"
@@ -697,6 +739,19 @@ EOT
 }
 
 ##################################################################
+_DoNotCareCPUs_()
+{
+   if [ $# -eq 0 ] || [ -z "$1" ]
+   then echo ; return 1
+   fi
+   local cpuNum="$(echo "$1" | awk -F' ' '{print $7}')"
+   local cpuPer="$(echo "$1" | awk -F' ' '{print $8}')"
+   local cmdStr="$(echo "$1" | awk -F' ' '{print $9}')"
+
+   echo "$1" | sed -E "s/([[:blank:]]+)(${cpuNum})([[:blank:]]+)(${cpuPer})([[:blank:]]+)(${cmdStr})/\1\[0-9\]\+\3\[0-9\]\+\[\.\]\[0-9\]\+\5\6/"
+}
+
+##################################################################
 _StuckProcessCmdsRunning_()
 {
    ProcCount="$(eval $FindProcs | grep -cv "$grepExcept0")"
@@ -773,7 +828,7 @@ _SaveStuckProcessCmds_()
 {
    local ProcXPID  ProcPPID  ProcFound  KillEntryLog
    local NowTimeSecs  LastTimeSecs  TimeDiffSecs  LastTime
-   local ProcStrX  ProcStrN  cmdState  cpuPrcnt  cpuNum
+   local ProcStrX  ProcStrN  cmdState  cpuPrcnt  cpuPerNum
    local nvramLockFile="/var/nvram.lock"  procKilled
 
    _GetStuckProcessCmds_
@@ -790,21 +845,22 @@ _SaveStuckProcessCmds_()
       then echo -n " " > "$StuckCmdsLOGfile"
       fi
 
-      ProcStrX="$(_EscapeChars_ "$ProcEntry1")"
-      ProcFound="$(grep -c "${ProcStrX}$" "$StuckCmdsLOGfile")"
+      # Make CPUnum & CPUpercent "don't cares" #
+      ProcStrX="$(_DoNotCareCPUs_ "$ProcEntry1")"
+      ProcFound="$(grep -c -E "${ProcStrX}$" "$StuckCmdsLOGfile")"
 
       LogMsg="FOUND_${thePID}: [$ProcFound][$ProcEntry1]"
       _AddDebugLogMsgs_ "$LogMsg"
 
       if [ "$ProcFound" -eq 0 ]
       then
-         _InsertListOfPIDs_ "$NowTime" "$ProcList"
-         RecheckStuckCmds=false
+          _InsertListOfPIDs_ "$NowTime" "$ProcList"
+          RecheckStuckCmds=false
       fi
 
       if [ "$ProcFound" -gt 0 ] && [ "$UseKillCmd" -eq 1 ]
       then
-         ProcStrN="$(grep -m 1 "${ProcStrX}$" "$StuckCmdsLOGfile")"
+         ProcStrN="$(grep -m1 -E "${ProcStrX}$" "$StuckCmdsLOGfile")"
 
          if [ -n "$ProcStrN" ]
          then
@@ -835,12 +891,11 @@ _SaveStuckProcessCmds_()
                      procKilled=true
                   elif [ "$cmdState" = "R" ]
                   then
-                      if echo "$cpuPrcnt" | grep -qE '^[0-9]+([.][0-9])*$'
+                      if echo "$cpuPrcnt" | grep -qE '^[0-9]+([.][0-9]+)?$'
                       then
-                          cpuNum="$(echo "$cpuPrcnt" | awk -F' ' '{print ($1 * 10)}')"
-                          if [ "$cpuNum" -gt 50 ]
+                          cpuPerNum="$(echo "$cpuPrcnt" | awk -F' ' '{print ($1 * 10)}')"
+                          if [ "$cpuPerNum" -gt 70 ]
                           then
-                              [ "$ProcPPID" -gt 2 ] && ProcXPID="$ProcPPID"
                               kill -9 $ProcXPID
                               LogMsg="[kill -9 $ProcXPID][$?]"
                               procKilled=true
