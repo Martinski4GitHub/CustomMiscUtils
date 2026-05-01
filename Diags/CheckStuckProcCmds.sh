@@ -18,7 +18,7 @@
 # Creation Date: 2022-Jun-12 [Martinski W.]
 # Last Modified: 2026-Apr-30 [Martinski W.]
 #
-readonly SCRIPT_VERSION="0.7.12"
+readonly SCRIPT_VERSION="0.7.13"
 readonly SCRIPT_VERSTAG="26043022"
 ######################################################################
 set -u 
