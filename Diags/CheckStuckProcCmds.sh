@@ -16,10 +16,10 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-Apr-30 [Martinski W.]
+# Last Modified: 2026-May-01 [Martinski W.]
 #
 readonly SCRIPT_VERSION="0.7.13"
-readonly SCRIPT_VERSTAG="26043022"
+readonly SCRIPT_VERSTAG="26050122"
 ######################################################################
 set -u 
 
@@ -263,7 +263,7 @@ _LastLogFileLineEmpty_()
 
 ################################################################
 _EscapeChars_()
-{ printf "%s\n" "$1" | sed 's/[][\/$.*^&-]/\\&/g' ; }
+{ printf "%s\n" "$1" | sed 's/[]{}[\/$.*^&+-]/\\&/g' ; }
 
 ################################################################
 _DeleteLastLogFileLineMarked_()
@@ -744,11 +744,14 @@ _DoNotCareCPUs_()
    if [ $# -eq 0 ] || [ -z "$1" ]
    then echo ; return 1
    fi
-   local cpuNum="$(echo "$1" | awk -F' ' '{print $7}')"
-   local cpuPer="$(echo "$1" | awk -F' ' '{print $8}')"
-   local cmdStr="$(echo "$1" | awk -F' ' '{print $9}')"
+   local cmdStrY
+   local cpuNumr="$(echo "$1" | awk -F' ' '{print $7}')"
+   local cpuPerc="$(echo "$1" | awk -F' ' '{print $8}')"
+   local cmdStrX="$(echo "$1" | awk -F' ' '{print $9}')"
+   cmdStrX="$(_EscapeChars_ "$cmdStrX")"
+   cmdStrY="$(_EscapeChars_ "$cmdStrX")"
 
-   echo "$1" | sed -E "s/([[:blank:]]+)(${cpuNum})([[:blank:]]+)(${cpuPer})([[:blank:]]+)(${cmdStr})/\1\[0-9\]\+\3\[0-9\]\+\[\.\]\[0-9\]\+\5\6/"
+   echo "$1" | sed -E "s/([[:blank:]]+)(${cpuNumr})([[:blank:]]+)(${cpuPerc})([[:blank:]]+)(${cmdStrX})/\1\[0-9\]\+\3\[0-9\]\+\[\.\]\[0-9\]\+\5${cmdStrY}/"
 }
 
 ##################################################################
@@ -842,7 +845,7 @@ _SaveStuckProcessCmds_()
       _ShowParentProcEntry_ "$ProcEntryN"
 
       if [ ! -f "$StuckCmdsLOGfile" ]
-      then echo -n " " > "$StuckCmdsLOGfile"
+      then printf " " > "$StuckCmdsLOGfile"
       fi
 
       # Make CPUnum & CPUpercent "don't cares" #
@@ -857,11 +860,11 @@ _SaveStuckProcessCmds_()
           _InsertListOfPIDs_ "$NowTime" "$ProcList"
           RecheckStuckCmds=false
       fi
+      LastTime=""; ProcXPID=""; ProcPPID=""; cmdState=""; cpuPrcnt=""
 
       if [ "$ProcFound" -gt 0 ] && [ "$UseKillCmd" -eq 1 ]
       then
          ProcStrN="$(grep -m1 -E "${ProcStrX}$" "$StuckCmdsLOGfile")"
-
          if [ -n "$ProcStrN" ]
          then
             LastTime="$(echo "$ProcStrN" | awk -F ' ' '{print $1,$2}')"
@@ -869,7 +872,10 @@ _SaveStuckProcessCmds_()
             ProcPPID="$(echo "$ProcStrN" | awk -F ' ' '{print $4}')"
             cmdState="$(echo "$ProcStrN" | awk -F ' ' '{print $6}')"
             cpuPrcnt="$(echo "$ProcStrN" | awk -F ' ' '{print $10}')"
-
+         fi
+         if [ -n "$ProcXPID" ] && [ -n "$ProcPPID" ] && \
+            [ -n "$LastTime" ] && [ -n "$cmdState" ] && [ -n "$cpuPrcnt" ]
+         then
             NowTimeSecs="$(date +%s -d "${NowTime}")"
             LastTimeSecs="$(date +%s -d "${LastTime}")"
             TimeDiffSecs="$((NowTimeSecs - LastTimeSecs))"
