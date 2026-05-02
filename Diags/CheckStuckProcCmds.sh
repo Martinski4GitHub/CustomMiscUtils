@@ -16,10 +16,10 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-May-01 [Martinski W.]
+# Last Modified: 2026-May-02 [Martinski W.]
 #
-readonly SCRIPT_VERSION="0.7.13"
-readonly SCRIPT_VERSTAG="26050122"
+readonly SCRIPT_VERSION="0.7.14"
+readonly SCRIPT_VERSTAG="26050205"
 ######################################################################
 set -u 
 
@@ -609,8 +609,8 @@ ProcEntry1=""
 ProcEntryN=""
 
 ## Look for 'nvram' or 'wl' commands ##
-readonly grepExcept0="grep -wE nvram|wl"
-readonly grepSearch0="grep -wE 'nvram|wl'"
+readonly grepExcept0="grep -E"
+readonly grepSearch0="grep -E '\b(nvram|wl)\b[[:blank:]]+'"
 
 ## Sort PIDs in descending order (from high to low) ##
 readonly SortPIDs="sort -n -r -t ' ' -k 1"
