@@ -19,7 +19,7 @@
 # Last Modified: 2026-May-02 [Martinski W.]
 #
 readonly SCRIPT_VERSION="0.7.14"
-readonly SCRIPT_VERSTAG="26050205"
+readonly SCRIPT_VERSTAG="26050218"
 ######################################################################
 set -u 
 
@@ -122,7 +122,7 @@ readonly DelMark="**=OK=**"
 ##################################################################
 _ShowUsage_()
 {
-   printf "\nVersion: ${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${NOct}\n"
+   printf "\nVersion: ${GRNct}${SCRIPT_VERSION}${NOct}_${YLWct}${SCRIPT_VERSTAG}${NOct}\n"
    cat <<EOF
 -----------------------------------------------
 SYNTAX:
@@ -167,7 +167,7 @@ EOF
 
 #################################################################
 _ShowVersion_()
-{ printf "\nVersion: ${GRNct}${SCRIPT_VERSION}${NOct}\n\n" ; }
+{ printf "\nVersion: ${GRNct}${SCRIPT_VERSION}${NOct}_${YLWct}${SCRIPT_VERSTAG}${NOct}\n\n" ; }
 
 #################################################################
 _GetFileSize_()
@@ -813,12 +813,16 @@ _GetStuckProcessCmds_()
       ProcEntryN="$(eval $FindProcs | eval $SortPIDs | \
                     grep -m $ProcCount -v "$grepExcept0")"
 
-      ProcState="$(echo "$ProcEntry1" | awk -F ' ' '{print $4}')"
-      if ! echo "$ProcState" | grep -qE "^(R|S|Z)$"
-      then ProcEntry1=""
+      if [ -n "$ProcEntry1" ] && [ -n "$ProcEntryN" ]
+      then
+          ProcState="$(echo "$ProcEntry1" | awk -F ' ' '{print $4}')"
+          if ! echo "$ProcState" | grep -qE "^(R|S|Z)$"
+          then ProcEntry1=""
+          fi
+      else
+          ProcCount=0 ; ProcState="XY"
       fi
    fi
-
    if [ "$ProcCount" -eq 0 ] || [ -z "$ProcEntry1" ]
    then
       LogMsg="FOUND_${thePID}: [$ProcCount][$ProcState]"
