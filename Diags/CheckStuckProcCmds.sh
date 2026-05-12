@@ -16,10 +16,10 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-May-02 [Martinski W.]
+# Last Modified: 2026-May-11 [Martinski W.]
 #
-readonly SCRIPT_VERSION="0.7.14"
-readonly SCRIPT_VERSTAG="26050218"
+readonly SCRIPT_VERSION="0.7.15"
+readonly SCRIPT_VERSTAG="26051122"
 ######################################################################
 set -u 
 
@@ -49,11 +49,11 @@ readonly SCRIPT_URL_GH="https://raw.githubusercontent.com/Martinski4GitHub/Custo
 
 DoMyLogger=1
 ShowDebugMsgs=0
-ShowMyDbgMsgs=0
 
 CRON_Set=0
+gotDelayArg=false
 readonly UseKillCmd=1
-readonly doDelaySecs=8
+readonly doSleepSecs=4
 readonly MaxDiffSecs=5
 readonly MaxTraceIndex=99999
 readonly CRON_Tag="CheckStuckCmds"
@@ -209,26 +209,13 @@ _DoInitMyLogFile_()
    [ ! -f "$TheLogFile" ] && touch "$TheLogFile"
 }
 
-################################################################
-_ShowMyDGBMsg_()
-{
-   [ "$ShowMyDbgMsgs" -eq 0 ] && return 1
-
-   if [ $# -eq 0 ]
-   then echo ""
-   elif [ $# -eq 1 ]
-   then echo "$1"
-   else echo "${1}:" "$2"
-   fi
-}
-
 ##################################################################
 _ShowDebugMsg_()
 {
    [ "$ShowDebugMsgs" -eq 0 ] && return 1
 
    if [ $# -eq 0 ]
-   then echo ""
+   then echo
    elif [ $# -eq 1 ]
    then echo "$1"
    else echo "${1}:" "$2"
@@ -583,12 +570,12 @@ _CheckScriptUpdate_()
 if [ $# -gt 0 ] && [ -n "$1" ]
 then
     case "$1" in
-        -setdelay) sleep $doDelaySecs ;;
         help|-help) _ShowUsage_ ; exit 0 ;;
         vers|-vers) _ShowVersion_ ; exit 0 ;;
         -delcronjob) _DeleteCronJob_ ; exit 0 ;;
         -checkupdate) _CheckScriptUpdate_ ; exit 0 ;;
         -setcronjob|-setcronjob=[1-9]*) ;; #CONTINUE#
+        -setdelay) gotDelayArg=true ; sleep $doSleepSecs ;;
         *) printf "\n*ERROR*: Unknown Parameter(s): [$*]\n\n"
            exit 1 ;;
     esac
@@ -758,11 +745,16 @@ _DoNotCareCPUs_()
 _StuckProcessCmdsRunning_()
 {
    ProcCount="$(eval $FindProcs | grep -cv "$grepExcept0")"
-
-   if [ "$ProcCount" -gt 0 ] && [ $# -eq 0 ]
+   if [ "$ProcCount" -gt 0 ]
    then
-      sleep 4   ## Let's wait some time to double check ##
-      ProcCount="$(eval $FindProcs | grep -cv "$grepExcept0")"
+       # Let's wait some time to double-check #
+       if [ $# -eq 0 ] || [ -z "$1" ]
+       then "$gotDelayArg" && sleep 2 || sleep 4
+       elif [ "$1" = "-ShowMsgStart" ]
+       then sleep 1
+       else usleep 500000
+       fi
+       ProcCount="$(eval $FindProcs | grep -cv "$grepExcept0")"
    fi
 
    if [ "$ProcCount" -eq 0 ]
@@ -773,6 +765,7 @@ _StuckProcessCmdsRunning_()
 
    if [ $# -gt 0 ] && echo "$1" | grep -qE "^-ShowMsg"
    then
+       [ -n "$theNumPIDs" ] && LogMsg="${LogMsg}[$theNumPIDs]"
        if [ "$ProcCount" -gt 0 ]
        then
            if [ "$1" = "-ShowMsgStart" ]
@@ -786,9 +779,21 @@ _StuckProcessCmdsRunning_()
                _AddDebugLogMsgs_ "$theLogMsgARGS"
            fi
            _AddMsgsToMyLog_ "_ADDnoMARK_" "$LogMsg"
+       else
+           if [ "$1" = "-ShowMsg2" ] || \
+              { [ "$1" = "-ShowMsg1" ] && \
+                [ "$RecheckStuckCmds" = "false" ] ; }
+           then
+               _AddMsgsToMyLog_ "_ADDnoMARK_" "$LogMsg"
+           else
+               _AddMsgsToMyLog_ "_ADDwithMARK_" "$LogMsg"
+           fi
        fi
    elif [ "$ProcCount" -eq 0 ]
    then
+       if false && [ -n "$theLogMsgARGS" ]
+       then _AddMsgsToMyLog_ "_ADDnoMARK_" "$theLogMsgARGS"
+       fi
        _AddMsgsToMyLog_ "_ADDwithMARK_" "$LogMsg"
    fi
 
@@ -940,6 +945,9 @@ _SaveStuckProcessCmds_()
 }
 
 theLogMsgARGS=""
+if [ -n "$*" ]
+then theLogMsgARGS="ARGs_${thePID}: [$*]"
+fi
 
 #################################
 # Initial Quick Check & Exit.
@@ -950,9 +958,7 @@ then
    exit 0
 fi
 
-if [ -n "$*" ]
-then theLogMsgARGS="ARGs_${thePID}: [$*]"
-fi
+theNumPIDs=""
 
 ############################################
 # Check for Stuck Processes (nvram & wl)
@@ -960,15 +966,15 @@ fi
 if _StuckProcessCmdsRunning_ "-ShowMsgStart"
 then
    _SaveStuckProcessCmds_
+   theNumPIDs="$(pidof "$ScriptFName1" | wc -w)"
 
-   if _StuckProcessCmdsRunning_ "-ShowMsg" && \
-      { [ "$ProcCount" -lt 4 ] && \
-        [ "$(pidof "$ScriptFName1" | wc -w)" -lt 3 ] ; }
+   if _StuckProcessCmdsRunning_ "-ShowMsg1" && \
+      [ "$theNumPIDs" -lt 4 ]
    then $ScriptFPath -setdelay &
    fi
 
    if "$RecheckStuckCmds" && \
-      ! _StuckProcessCmdsRunning_ "-ShowMsg"
+      ! _StuckProcessCmdsRunning_ "-ShowMsg2"
    then _ResetStuckProcessCmdsFile_
    fi
 
