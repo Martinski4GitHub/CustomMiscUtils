@@ -331,7 +331,7 @@ _CheckScriptUpdate_()
       grep -Eiq "^404: Not Found" "$theTempFile"
    then
        [ -s "$theTempFile" ] && cat "$theTempFile"
-       _PrintMsg_ "\n${REDct}**ERROR**${NOct}: Could NOT download the latest script file.\n"
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Could NOT download the latest script file.\n"
        rm -f "$theTempFile"
        return 1
    fi
@@ -363,10 +363,10 @@ _CheckScriptUpdate_()
        return 0
    fi
 
-   _PrintMsg_ "\nLatest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${NOct}] available.\n"
+   _PrintMsg_ "\nLatest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${CLRct}] available.\n"
    mv -f "$theTempFile" "$scriptFPath"
    chmod 755 "$scriptFPath"
-   _PrintMsg_ "Script has been updated to the latest version [${GRNct}${dlVersionStr}_${dlVersTagStr}${NOct}].\n\n"
+   _PrintMsg_ "Script has been updated to the latest version [${GRNct}${dlVersionStr}_${dlVersTagStr}${CLRct}].\n\n"
    return 0
 }
 
