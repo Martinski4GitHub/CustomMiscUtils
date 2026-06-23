@@ -16,10 +16,10 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-May-11 [Martinski W.]
+# Last Modified: 2026-May-15 [Martinski W.]
 #
-readonly SCRIPT_VERSION="0.7.15"
-readonly SCRIPT_VERSTAG="26051122"
+readonly SCRIPT_VERSION="0.7.16"
+readonly SCRIPT_VERSTAG="26051522"
 ######################################################################
 set -u 
 
@@ -537,7 +537,7 @@ _CheckScriptUpdate_()
        return 1
    fi
 
-   chmod 755 "$theTempFile"
+   chmod 666 "$theTempFile"
    dlVersionStr="$(grep -E '^readonly SCRIPT_VERSION=' "$theTempFile")"
    dlVersTagStr="$(grep -E '^readonly SCRIPT_VERSTAG=' "$theTempFile")"
    if [ -z "$dlVersionStr" ] || [ -z "$dlVersTagStr" ]
@@ -557,6 +557,7 @@ _CheckScriptUpdate_()
       [ "$dlVersTagStr" = "$SCRIPT_VERSTAG" ]
    then
        printf "\nYou have the latest script version [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${NOct}] available.\n\n"
+       rm -f "$theTempFile"
        return 0
    fi
 
