@@ -36,7 +36,7 @@
 #
 # CHECK FOR SCRIPT UPDATES:
 # -------------------------
-# LogMemoryStats.sh -versioncheck [-verbose | -quiet | -veryquiet]
+# LogMemoryStats.sh -checkupdate [-verbose | -quiet | -veryquiet]
 #
 # FOR DIAGNOSTICS PURPOSES:
 # -------------------------
@@ -54,16 +54,16 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2026-Feb-10 [Martinski W.]
+# Last Modified: 2026-May-15 [Martinski W.]
 #########################################################################
 set -u
 
-readonly LMS_VERSION="0.7.16"
-readonly LMS_VERFILE="lmsVersion.txt"
-readonly LMS_VERSTAG="26021020"
+readonly SCRIPT_VERSION="0.7.17"
+readonly SCRIPT_VERSTAG="26051522"
 
+readonly SCRIPT_FNAME="LogMemoryStats.sh"
 readonly SCRIPT_BRANCH="master"
-readonly LMS_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
+readonly SCRIPT_URL_GH="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
 
 readonly branchStr_TAG="[Branch: $SCRIPT_BRANCH]"
 readonly scriptFileName="${0##*/}"
@@ -75,6 +75,12 @@ readonly duFilterSizeKB=500   #Filter for "du" output#
 readonly CPU_Temptr_ProcDMUtemp="/proc/dmu/temperature"
 readonly CPU_Temptr_SysPowerCPU="/sys/power/bpcm/cpu_temp"
 readonly CPU_Temptr_ThermalZone="/sys/devices/virtual/thermal/thermal_zone0/temp"
+
+readonly CLRct="\e[0m"
+readonly REDct="\e[1;31m"
+readonly GRNct="\e[1;32m"
+readonly YLWct="\e[1;33m"
+readonly MGNTct="\e[1;35m"
 
 # Give priority to built-in binaries #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -114,6 +120,7 @@ fi
 # that survives a reboot so logs are not deleted.
 #-----------------------------------------------------
 readonly HOMEdir="/home/root"
+readonly TEMP_DIRPATH="/tmp/var/tmp"
 readonly defLogDirectoryPath="/opt/var/log"
 readonly altLogDirectoryPath="/jffs/scripts/logs"
 
@@ -138,12 +145,13 @@ readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_E
 readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/master/EMail"
 
+if [ -t 0 ] && ! tty | grep -qwi "NOT"
+then readonly isInteractive=true
+else readonly isInteractive=false
+fi
+
 scriptLogFPath="${userLogDirectoryPath}/$scriptLogFName"
 backupLogFPath="${userLogDirectoryPath}/$backupLogFName"
-
-isInteractive=false
-if [ -t 0 ] && ! tty | grep -qwi "not"
-then isInteractive=true ; fi
 
 #-----------------------------------------------------------------------#
 _PrintMsg_()
@@ -216,8 +224,8 @@ To disable sending email notifications for threshold alerts:
 To test alert notifications using some dummy/fake threshold data:
    ./$scriptFileName [-cputest | -jffstest | -tmpfstest | -nvramtest]
 
-To check for script updates:
-   ./$scriptFileName -versioncheck [-verbose | -quiet | -veryquiet]
+To check for and install the latest script version update:
+   ./$scriptFileName -checkupdate [-verbose | -quiet | -veryquiet]
 ----------------------------------------------------------------------------
 EOF
 }
@@ -291,8 +299,13 @@ _DownloadCEMLibraryHelperFile_()
 }
 
 #-----------------------------------------------------------#
-_CheckForScriptUpdates_()
+_CheckScriptUpdate_()
 {
+   local dlVersionStr  dlVersTagStr  scriptMD5  dlTempMD5
+   local scriptVerNum  dlFileVerNum  isVerboseMode
+   local scriptFPath="${scriptDirPath}/$SCRIPT_FNAME"
+   local theTempFile="${TEMP_DIRPATH}/${SCRIPT_FNAME}.TMP"
+
    _VersionStrToNum_()
    {
       if [ $# -eq 0 ] || [ -z "$1" ] ; then echo 0 ; return 1 ; fi
@@ -303,55 +316,58 @@ _CheckForScriptUpdates_()
       verNum="$(echo "$verNum" | sed 's/^0*//')"
       echo "$verNum" ; return 0
    }
-   if [ $# -eq 0 ] || [ -z "$1" ]
-   then
-       _PrintMsg_ "\n**ERROR**: NO parameter given for directory path.\n"
-       return 1
-   fi
-   if [ ! -d "$1" ]
-   then
-       _PrintMsg_ "\n**ERROR**: Directory Path [$1] *NOT* FOUND.\n"
-       return 1
-   fi
-   local theVersTextFile="${1}/$LMS_VERFILE"
-   local scriptVerNum  dlFileVerNum  dlFileVerStr
-   local isVerboseMode  retCode
 
-   if [ $# -gt 1 ] && echo "$2" | grep -qE "^(-quiet|-veryquiet)$"
-   then isVerboseMode=false ; else isVerboseMode=true ; fi
+   if [ $# -gt 0 ] && echo "$1" | grep -qE "^(-quiet|-veryquiet)$"
+   then isVerboseMode=false ; else isVerboseMode=true
+   fi
 
    "$isVerboseMode" && \
    _PrintMsg_ "\nChecking for script updates...\n"
 
    curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
-   "${LMS_SCRIPT_URL}/$LMS_VERFILE" -o "$theVersTextFile"
+   "${SCRIPT_URL_GH}/$SCRIPT_FNAME" -o "$theTempFile"
 
-   if [ ! -s "$theVersTextFile" ] || \
-      grep -Eiq "^404: Not Found" "$theVersTextFile"
+   if [ ! -s "$theTempFile" ] || \
+      grep -Eiq "^404: Not Found" "$theTempFile"
    then
-       [ -s "$theVersTextFile" ] && cat "$theVersTextFile"
-       _PrintMsg_ "\n**ERROR**: Could not download the version file [$LMS_VERFILE]\n"
-       rm -f "$theVersTextFile"
+       [ -s "$theTempFile" ] && cat "$theTempFile"
+       _PrintMsg_ "\n${REDct}**ERROR**${NOct}: Could NOT download the latest script file.\n"
+       rm -f "$theTempFile"
        return 1
    fi
-   chmod 666 "$theVersTextFile"
-   dlFileVerStr="$(cat "$theVersTextFile")"
 
-   dlFileVerNum="$(_VersionStrToNum_ "$dlFileVerStr")"
-   scriptVerNum="$(_VersionStrToNum_ "$LMS_VERSION")"
-
-   if [ "$dlFileVerNum" -le "$scriptVerNum" ]
+   chmod 666 "$theTempFile"
+   dlVersionStr="$(grep -E '^readonly SCRIPT_VERSION=' "$theTempFile")"
+   dlVersTagStr="$(grep -E '^readonly SCRIPT_VERSTAG=' "$theTempFile")"
+   if [ -z "$dlVersionStr" ] || [ -z "$dlVersTagStr" ]
    then
-       retCode=1
-       "$isVerboseMode" && _PrintMsg_ "Done.\n"
-   else
-       retCode=0
-       "$isVerboseMode" && \
-       _PrintMsg_ "New script version update [$dlFileVerStr] available.\n"
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Could NOT find the VERSION string.\n"
+       rm -f "$theTempFile"
+       return 1
    fi
 
-   rm -f "$theVersTextFile"
-   return "$retCode"
+   dlTempMD5="$(md5sum "$theTempFile" 2>/dev/null | awk -F' ' '{print $1}')"
+   scriptMD5="$(md5sum "$scriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
+   dlVersionStr="$(echo "$dlVersionStr" | tr -d '"' | cut -d'=' -f2)"
+   dlVersTagStr="$(echo "$dlVersTagStr" | tr -d '"' | cut -d'=' -f2)"
+   dlFileVerNum="$(_VersionStrToNum_ "$dlVersionStr")"
+   scriptVerNum="$(_VersionStrToNum_ "$SCRIPT_VERSION")"
+
+   if [ "$scriptMD5" = "$dlTempMD5" ] && \
+      [ "$dlVersionStr" = "$SCRIPT_VERSION" ] && \
+      [ "$dlVersTagStr" = "$SCRIPT_VERSTAG" ] && \
+      [ "$dlFileVerNum" -le "$scriptVerNum" ]
+   then
+       _PrintMsg_ "\nYou have the latest script version [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${CLRct}] available.\n\n"
+       rm -f "$theTempFile"
+       return 0
+   fi
+
+   _PrintMsg_ "\nLatest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${NOct}] available.\n"
+   mv -f "$theTempFile" "$scriptFPath"
+   chmod 755 "$scriptFPath"
+   _PrintMsg_ "Script has been updated to the latest version [${GRNct}${dlVersionStr}_${dlVersTagStr}${NOct}].\n\n"
+   return 0
 }
 
 #-----------------------------------------------------------------------#
@@ -2081,16 +2097,16 @@ do
        "-verbose" | "-quiet" | "-veryquiet")
           quietArg="$PARAM"
           ;;
-       -versioncheck)
+       -checkupdate)
           updateArg="$PARAM"
           ;;
        *) ;; #CONTINUE#
    esac
 done
 
-if [ "$updateArg" = "-versioncheck" ]
+if [ "$updateArg" = "-checkupdate" ]
 then
-    _CheckForScriptUpdates_ "$(pwd)" "$quietArg"
+    _CheckScriptUpdate_ "$quietArg"
     exit $?
 fi
 
@@ -2102,8 +2118,8 @@ readonly routerMODEL_ID="$(_GetRouterModelID_)"
 readonly routerFWversion="$(_GetCurrentFWVersion_)"
 
 if [ "$SCRIPT_BRANCH" = "master" ]
-then scriptVersInfo="$LMS_VERSION"
-else scriptVersInfo="${LMS_VERSION}_${LMS_VERSTAG}"
+then scriptVersInfo="$SCRIPT_VERSION"
+else scriptVersInfo="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
 fi
 
 _CheckConfigurationFile_
