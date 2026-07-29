@@ -54,12 +54,12 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2026-May-15 [Martinski W.]
+# Last Modified: 2026-Jul-24 [Martinski W.]
 #########################################################################
 set -u
 
-readonly SCRIPT_VERSION="0.7.17"
-readonly SCRIPT_VERSTAG="26051522"
+readonly SCRIPT_VERSION="0.7.18"
+readonly SCRIPT_VERSTAG="26072423"
 
 readonly SCRIPT_FNAME="LogMemoryStats.sh"
 readonly SCRIPT_BRANCH="master"
@@ -1155,6 +1155,21 @@ _ProcMemInfo_()
    grep -E '^Swap[TFC].*:[[:blank:]]+.*' /proc/meminfo
    grep -E '^(Active|Inactive)(\([af].*\))?:[[:blank:]]+.*' /proc/meminfo
    grep -E '^(Dirty|Writeback|AnonPages|Unevictable):[[:blank:]]+.*' /proc/meminfo
+   grep -E '^(CommitLimit|Committed_AS):[[:blank:]]+.*' /proc/meminfo
+}
+
+#-----------------------------------------------------------------------#
+_VM_OverCommitInfo_()
+{
+   printf "/proc/sys/vm\n------------\n"
+   printf "swappiness = "
+   cat /proc/sys/vm/swappiness
+   printf "overcommit_ratio  = "
+   cat /proc/sys/vm/overcommit_ratio
+   printf "overcommit_memory = "
+   cat /proc/sys/vm/overcommit_memory
+   printf "overcommit_kbytes = "
+   cat /proc/sys/vm/overcommit_kbytes
 }
 
 duMinKB="$duFilterSizeKB"
@@ -2210,6 +2225,7 @@ fi
    _CPU_Temperature_ ; echo
    printf "free:\n" ; free ; echo
    _ProcMemInfo_ ; echo
+   _VM_OverCommitInfo_ ; echo
    df -hT | head -n1
    df -hT | grep -E '(/jffs$|/tmp$|/var$)' | sort -d -t ' ' -k 7
    _Show_USB_Drives_
