@@ -16,6 +16,7 @@ else return 0
 fi
 
 CEM_LIB_VERSION="0.9.24"
+CEM_LIB_VERSTAG="25010223"
 CEM_TXT_VERFILE="cemVersion.txt"
 
 CEM_LIB_REPO_BRANCH="master"
