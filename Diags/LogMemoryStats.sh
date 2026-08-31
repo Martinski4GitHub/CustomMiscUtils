@@ -54,12 +54,12 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2026-Jul-24 [Martinski W.]
+# Last Modified: 2026-Aug-30 [Martinski W.]
 #########################################################################
 set -u
 
-readonly SCRIPT_VERSION="0.7.18"
-readonly SCRIPT_VERSTAG="26072423"
+readonly SCRIPT_VERSION="0.7.19"
+readonly SCRIPT_VERSTAG="26083023"
 
 readonly SCRIPT_FNAME="LogMemoryStats.sh"
 readonly SCRIPT_BRANCH="master"
@@ -353,10 +353,8 @@ _CheckScriptUpdate_()
    dlFileVerNum="$(_VersionStrToNum_ "$dlVersionStr")"
    scriptVerNum="$(_VersionStrToNum_ "$SCRIPT_VERSION")"
 
-   if [ "$scriptMD5" = "$dlTempMD5" ] && \
-      [ "$dlVersionStr" = "$SCRIPT_VERSION" ] && \
-      [ "$dlVersTagStr" = "$SCRIPT_VERSTAG" ] && \
-      [ "$dlFileVerNum" -le "$scriptVerNum" ]
+   if [ "$scriptMD5" = "$dlTempMD5" ] || \
+      [ "$dlFileVerNum" -lt "$scriptVerNum" ]
    then
        _PrintMsg_ "\nYou have the latest script version [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${CLRct}] available.\n\n"
        rm -f "$theTempFile"
