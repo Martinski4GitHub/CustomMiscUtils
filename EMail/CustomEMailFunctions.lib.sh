@@ -5,9 +5,9 @@
 #
 # Custom miscellaneous definitions and functions to send
 # email notifications using AMTM email configuration file.
-#
+#---------------------------------------------------------------------
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Aug-30 [Martinski W.]
+# Last Modified: 2026-Sep-09 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -16,15 +16,15 @@ else return 0
 fi
 
 CEM_LIB_VERSION="1.0.1"
-CEM_LIB_VERSTAG="26083023"
+CEM_LIB_VERSTAG="26090901"
 CEM_TXT_VERFILE="cemVersion.txt"
 
-CEM_LIB_REPO_BRANCH="master"
+CEM_LIB_REPO_BRANCH="develop"   ##**TBD "master" RELEASE**##
 CEM_LIB_SCRIPT_URL2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/${CEM_LIB_REPO_BRANCH}/EMail"
 CEM_LIB_SCRIPT_URL1="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${CEM_LIB_REPO_BRANCH}/EMail"
 
 if [ -z "${cemIsVerboseMode:+xSETx}" ]
-then cemIsVerboseMode=false ; fi
+then cemIsVerboseMode=true ; fi
 
 if [ -z "${cemIsFormatHTML:+xSETx}" ]
 then cemIsFormatHTML=true ; fi
@@ -48,10 +48,17 @@ cemCustomEmailLibScriptFName="CustomEMailFunctions.lib.sh"
 cemCustomEmailLibScriptFPath="${cemAddOnsSharedLibsDirPath}/$cemCustomEmailLibScriptFName"
 
 CEM_TEMP_DIR="/tmp/var/tmp"
-cemHTTPstatusStr="HTTP/S_Status_Code"
+cemHTTPstatusStr="HTTP_Status_Code"
 cemTmpCurlLogFile="${CEM_TEMP_DIR}/tmpEMail_${cemScriptFNameTag}_$$.TMP.LOG"
 cemErrCurlLogFile="${CEM_TEMP_DIR}/tmpEMail_${cemScriptFNameTag}_$$.ERR.LOG"
 cemTmpEMailContent="${CEM_TEMP_DIR}/tmpEMailContent_${cemScriptFNameTag}_$$.TXT"
+
+cemNvramInitUSleep=10
+cemNvramWaitUSleep=50
+cemNvramWaitFactor=20000
+cemNvramWaitSecMAX=2
+cemNvramWaitCntMAX="$((cemNvramWaitSecMAX * cemNvramWaitFactor))"
+cemNvramValTmpFPath="${CEM_TEMP_DIR}/nvramValue_${cemScriptFNameTag}_$$.TMP.TXT"
 
 cemSysLogALERT=1
 cemSysLogCRITC=2
@@ -118,8 +125,15 @@ _LogMsg_CEM_()
    else cemLogPrioNum="$cemSysLogNOTIC"
    fi
 
-   if "$cemIsInteractive" && "$cemIsVerboseMode"
-   then printf "${cemScriptFNameTag}: ${1}\n"
+   if "$cemIsInteractive" && "$cemIsVerboseMode" && \
+      { [ $# -lt 3 ] || [ "$3" != "NOECHO" ] ; }
+   then
+       if [ "$cemLogPrioNum" -gt "$cemSysLogWARNG" ]
+       then printf "${1}\n"
+       elif [ "$cemLogPrioNum" -eq "$cemSysLogWARNG" ]
+       then printf "${cemYLWct}${1}${cemCLRct}\n"
+       else printf "${cemREDct}${1}${cemCLRct}\n"
+       fi
    fi
    if "$cemDoSystemLog"
    then $cemSysLogger -t "$cemLogTagStr" -p "$cemLogPrioNum" "$1"
@@ -141,9 +155,11 @@ _DownloadScriptFile_CEM_()
    if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
    then return 1
    fi
+   local srcFilePathURL="${1}/$2"
+   local theTempFPathDL="${CEM_TEMP_DIR}/${2}.DL.$$.TMP"
+   local theDestFName="$2"  theDestFPath="$3"
+   local theMsgStr  logMsgStr
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
-   local theSrceFPath="${1}/$2"  theDestFName="$2"  theDestFPath="$3"
-   local theTempFPathDL="${3}.DL.TMP"
 
    rm -f "$theTempFPathDL"
    printf '' > "$cemErrCurlLogFile"
@@ -152,11 +168,11 @@ _DownloadScriptFile_CEM_()
    /usr/sbin/curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
    --connect-timeout 30 --max-time 60 \
    -w "${cemHTTPstatusStr}: %{http_code}\n" --stderr "$cemErrCurlLogFile" \
-   "$theSrceFPath" --output "$theTempFPathDL" >> "$cemTmpCurlLogFile"
+   "$srcFilePathURL" --output "$theTempFPathDL" >> "$cemTmpCurlLogFile"
    curlRetCode="$?"
 
    statusCODE="$curlRetCode"
-   statusSTRx="[Curl Status Code: $curlRetCode]"
+   statusSTRx="Curl Status Code: $curlRetCode"
    httpStatusSTR="$(grep -oE "${cemHTTPstatusStr}: [4-5][0-9]{2,}" "$cemTmpCurlLogFile")"
 
    if [ "$curlRetCode" -eq 0 ] && \
@@ -168,15 +184,18 @@ _DownloadScriptFile_CEM_()
        if [ "$curlRetCode" -eq 0 ] && [ -n "$httpStatusSTR" ]
        then
            statusCODE="$(echo "$httpStatusSTR" | awk -F' ' '{print $2}')"
-           statusSTRx="[HTTP/S Status Code: $statusCODE]"
+           statusSTRx="HTTP Status Code: $statusCODE"
        fi
+       logMsgStr="**ERROR**: Unable to download the script file [$theDestFName] [${statusSTRx}]"
+       theMsgStr="${cemREDct}**ERROR**${cemCLRct}: Unable to download the script file [$theDestFName] [${cemMGNTct}${statusSTRx}${cemCLRct}]"
+       _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR" NOECHO
+
        if [ "$4" -eq "$urlDLMax" ] || "$showAllMsgs" || "$showWarnings"
        then
            if [ -s "$cemErrCurlLogFile" ]
            then echo ; cat "$cemErrCurlLogFile"
            fi
-           _PrintMsg_CEM_ "\n${cemREDct}**ERROR**${cemCLRct}: Unable to download the script file [$theDestFName]"
-           _PrintMsg_CEM_ "\n${cemMGNTct}${statusSTRx}${cemCLRct}\n"
+           _PrintMsg_CEM_ "\n${theMsgStr}\n"
            [ "$4" -lt "$urlDLMax" ] && \
            _PrintMsg_CEM_ "\nTrying again with a different URL...\n"
        fi
@@ -247,8 +266,8 @@ _CheckLibraryUpdates_CEM_()
    then return 1
    fi
 
-   dlVersionStr="$(grep -E '^CEM_LIB_VERSION=' "$theTmpFilePath")"
-   dlVersTagStr="$(grep -E '^CEM_LIB_VERSTAG=' "$theTmpFilePath")"
+   dlVersionStr="$(grep -E '^CEM_LIB_VERSION=' "$theTmpFilePath" | tr -d '"')"
+   dlVersTagStr="$(grep -E '^CEM_LIB_VERSTAG=' "$theTmpFilePath" | tr -d '"')"
 
    if [ -z "$dlVersionStr" ] || [ -z "$dlVersTagStr" ]
    then
@@ -259,8 +278,8 @@ _CheckLibraryUpdates_CEM_()
 
    dlTempMD5="$(md5sum "$theTmpFilePath" 2>/dev/null | awk -F' ' '{print $1}')"
    scriptMD5="$(md5sum "$theScriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
-   dlVersionStr="$(echo "$dlVersionStr" | tr -d '"' | cut -d'=' -f2)"
-   dlVersTagStr="$(echo "$dlVersTagStr" | tr -d '"' | cut -d'=' -f2)"
+   dlVersionStr="$(echo "$dlVersionStr" | sed -e 's/.*CEM_LIB_VERSION=//;s/ .*$//')"
+   dlVersTagStr="$(echo "$dlVersTagStr" | sed -e 's/.*CEM_LIB_VERSTAG=//;s/ .*$//')"
    dlFileVerNum="$(_VersionStrToNum_ "$dlVersionStr")"
    scriptVerNum="$(_VersionStrToNum_ "$CEM_LIB_VERSION")"
 
@@ -269,7 +288,7 @@ _CheckLibraryUpdates_CEM_()
    then
        retCode=1
        "$showAllMsgs" && \
-       _PrintMsg_CEM_ "Update check done.\n"
+       _PrintMsg_CEM_ "You have the latest email library script version [${cemGRNct}${CEM_LIB_VERSION}_${CEM_LIB_VERSTAG}${cemCLRct}] installed.\n"
    else
        retCode=0
        _DoReInit_CEM_
@@ -282,16 +301,71 @@ _CheckLibraryUpdates_CEM_()
 }
 
 #-----------------------------------------------------------#
+_NVRAM_Get_()
+{
+   local nvramProcID  nvramProcOK=false  retCode=1
+   local waitCountNUM=0  logMsgStr  nvramKeyValue=""
+
+   printf '' > "$cemNvramValTmpFPath"
+   nvram get "$1" > "$cemNvramValTmpFPath" &
+   nvramProcID="$!"
+   usleep "$cemNvramInitUSleep"
+
+   while true
+   do
+       if ! kill -EXIT "$nvramProcID" 2>/dev/null
+       then nvramProcOK=true ; break
+       fi
+       usleep "$cemNvramWaitUSleep"
+       waitCountNUM="$((waitCountNUM + 1))"
+       if [ "$waitCountNUM" -ge "$cemNvramWaitCntMAX" ]
+       then break
+       fi
+   done
+
+   if kill -EXIT "$nvramProcID" 2>/dev/null
+   then
+       retCode=555
+       nvramProcOK=false
+       kill -KILL "$nvramProcID" 2>/dev/null ; wait "$nvramProcID"
+       logMsgStr="**ALERT**: Wait timeout [$cemNvramWaitSecMAX secs] for 'nvram get $1' command expired."
+       _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR" NOECHO
+   fi
+   if "$nvramProcOK" && [ -s "$cemNvramValTmpFPath" ]
+   then
+       nvramKeyValue="$(cat "$cemNvramValTmpFPath")"
+       retCode=0
+   fi
+
+   rm -f "$cemNvramValTmpFPath"
+   echo "$nvramKeyValue"
+   return "$retCode"
+}
+
+#-----------------------------------------------------------#
 _GetRouterModelID_CEM_()
 {
-   local retCode=1  routerModelID=""
+   local retCode=1  nvramKeyName  nvramKeyValue=""
    local nvramModelKeys="odmpid wps_modelnum model build_name"
-   for nvramKey in $nvramModelKeys
+   for nvramKeyName in $nvramModelKeys
    do
-       routerModelID="$(nvram get "$nvramKey")"
-       [ -n "$routerModelID" ] && retCode=0 && break
+       nvramKeyValue="$(_NVRAM_Get_ "$nvramKeyName")"
+       if [ -n "$nvramKeyValue" ]
+       then retCode=0 && break
+       fi
    done
-   echo "$routerModelID" ; return "$retCode"
+   echo "$nvramKeyValue" ; return "$retCode"
+}
+
+#-----------------------------------------------------------#
+_GetRouterUserNameID_CEM_()
+{
+   local nvramKeyValue=""
+   nvramKeyValue="$(_NVRAM_Get_ http_username)"
+   if [ -n "$nvramKeyValue" ]
+   then echo "$nvramKeyValue" ; return 0
+   fi
+   echo "$cemScriptFNameTag" ; return 0
 }
 
 #-----------------------------------------------------------#
@@ -329,19 +403,21 @@ _CheckEMailConfigFileFromAMTM_CEM_()
 }
 
 #-------------------------------------------------------#
-# ARG1: Email Subject String
-# ARG2: Email Body File or String
-# ARG3: Email Body Title String [OPTIONAL]
+# ARG1: Email Subject string.
+# ARG2: Email Body message string or the full path of
+#       a file containing the Email Body message.
+# ARG3: Email Body Title string [OPTIONAL].
 #-------------------------------------------------------#
 _CreateEMailContent_CEM_()
 {
     if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
-    then return 1 ; fi
+    then return 1
+    fi
     local emailBodyMsge  emailBodyFile  emailBodyTitle=""
 
     rm -f "$cemTmpEMailContent"
 
-    if ! echo "$2" | grep -q '^-F='
+    if ! echo "$2" | grep -qE '^-F=.+'
     then
         emailBodyMsge="$2"
     else
@@ -436,9 +512,10 @@ EOF
 }
 
 #-------------------------------------------------------#
-# ARG1: Email Subject String
-# ARG2: Email Body File or String
-# ARG3: Email Body Title String [OPTIONAL]
+# ARG1: Email Subject string.
+# ARG2: Email Body message string or the full path of
+#       a file containing the Email Body message.
+# ARG3: Email Body Title string [OPTIONAL].
 #-------------------------------------------------------#
 _SendEMailNotification_CEM_()
 {
@@ -447,18 +524,18 @@ _SendEMailNotification_CEM_()
    then return 1 ; fi
 
    local CC_ADDRESS_STR=""  CC_ADDRESS_ARG=""
-   local logMsgStr  logPrioNum  mailpwd
+   local theMsgStr  logMsgStr  logPrioNum  mailpwd
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
-   [ -z "$FROM_NAME" ] && FROM_NAME="$cemScriptFNameTag"
+   [ -z "$FROM_NAME" ] && FROM_NAME="$(_GetRouterUserNameID_CEM_)"
    [ -z "$FRIENDLY_ROUTER_NAME" ] && FRIENDLY_ROUTER_NAME="$(_GetRouterModelID_CEM_)"
 
    ! _CreateEMailContent_CEM_ "$@" && return 1
 
-   if "$cemIsInteractive" && "$cemIsVerboseMode"
+   if "$cemIsVerboseMode"
    then
-       printf "\nSending email notification [$1]"
-       printf "\nPlease wait...\n"
+       _PrintMsg_CEM_ "\nSending email notification [${cemGRNct}${1}${cemCLRct}]."
+       _PrintMsg_CEM_ "\nPlease wait...\n"
    fi
 
    printf '' > "$cemErrCurlLogFile"
@@ -477,21 +554,24 @@ _SendEMailNotification_CEM_()
    curlRetCode="$?"
 
    statusCODE="$curlRetCode"
-   statusSTRx="Curl Code: $curlRetCode"
+   statusSTRx="Curl Status Code: $curlRetCode"
    httpStatusSTR="$(grep -oE "${cemHTTPstatusStr}: [4-5][0-9]{2,}" "$cemTmpCurlLogFile")"
 
    if [ "$curlRetCode" -eq 0 ] && [ -z "$httpStatusSTR" ]
    then
        logPrioNum="$cemSysLogINFOR"
-       logMsgStr="The email notification was sent successfully."
+       logMsgStr="The email notification [$1] was sent successfully."
+       theMsgStr="The email notification [${cemGRNct}${1}${cemCLRct}] was sent successfully.\n"
    else
        if [ "$curlRetCode" -eq 0 ] && [ -n "$httpStatusSTR" ]
        then
            statusCODE="$(echo "$httpStatusSTR" | awk -F' ' '{print $2}')"
-           statusSTRx="HTTP/S Code: $statusCODE"
+           statusSTRx="HTTP Status Code: $statusCODE"
        fi
        logPrioNum="$cemSysLogERROR"
-       logMsgStr="**ERROR**: Failure to send email notification [$statusSTRx]."
+       logMsgStr="**ERROR**: Failure to send email notification [$1] [$statusSTRx]."
+       theMsgStr="${cemREDct}**ERROR**${cemCLRct}: Failure to send email notification [${cemMGNTct}${1}${cemCLRct}] [${cemREDct}${statusSTRx}${cemCLRct}].\n\n"
+
        if [ -s "$cemErrCurlLogFile" ] && \
           "$cemIsInteractive" && "$cemIsVerboseMode" && "$cemIsDebugMode"
        then
@@ -502,7 +582,11 @@ _SendEMailNotification_CEM_()
    fi
    sleep 2
    mailpwd='' ; unset mailpwd
-   _LogMsg_CEM_ "$logMsgStr" "$logPrioNum"
+
+   if "$cemIsVerboseMode" || [ "$logPrioNum" = "$cemSysLogERROR" ]
+   then _PrintMsg_CEM_ "$theMsgStr"
+   fi
+   _LogMsg_CEM_ "$logMsgStr" "$logPrioNum" NOECHO
 
    if "$cemDeleteMailContentFile"
    then rm -f "$cemTmpEMailContent"
