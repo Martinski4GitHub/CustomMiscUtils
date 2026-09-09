@@ -97,6 +97,11 @@ To get this usage and syntax description:
    ${GRNct}./$scriptFileName ${CYANct}-help${CLRct}
 
 
+To display version information:
+
+   ${GRNct}./$scriptFileName ${CYANct}-version${CLRct}
+
+
 To check for and install the latest script version update: 
 
    ${GRNct}./$scriptFileName ${CYANct}-checkupdate${CLRct}
@@ -694,7 +699,7 @@ showUsage=false
 if [ $# -eq 0 ] || [ -z "$1" ] || echo "$1" | grep -qE "^[-]?help$"
 then
     showUsage=true
-elif ! echo "$1" | grep -qE '^-(send|test|checkupdate|uninstall|viewconf)$'
+elif ! echo "$1" | grep -qE '^-(send|test|checkupdate|version|uninstall|viewconf)$'
 then
     _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: NO valid arguments [$*] were provided.\n"
     showUsage=true ; _PressAnyKey_
@@ -702,6 +707,12 @@ fi
 "$showUsage" && { _ShowUsage_ ; exit 0 ; }
 
 action="$1" ; shift
+
+if [ "$action" = "-version" ]
+then
+    _PrintMsg_ "\nVersion: ${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${CLRct}\n\n"
+    exit 0
+fi
 
 if [ "$action" = "-uninstall" ]
 then
