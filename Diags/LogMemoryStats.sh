@@ -54,12 +54,12 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2026-Sep-09 [Martinski W.]
+# Last Modified: 2026-Sep-10 [Martinski W.]
 #########################################################################
 set -u
 
 readonly SCRIPT_VERSION="0.8.0"
-readonly SCRIPT_VERSTAG="26090901"
+readonly SCRIPT_VERSTAG="26091023"
 readonly SCRIPT_TNAME="LogMemoryStats"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
@@ -76,6 +76,9 @@ readonly CEM_LIB_GH_URL1="${REPO_GHB_URL1}/$URL_EMAIL_DIR"
 
 readonly HOMEdir="/home/root"
 readonly TEMP_DIR="/tmp/var/tmp"
+readonly JFFS_ADDONS_DIR="/jffs/addons"
+readonly JFFS_SCRIPTS_DIR="/jffs/scripts"
+
 readonly branchStr_TAG="[Branch: $SCRIPT_BRANCH]"
 readonly scriptFileName="${0##*/}"
 readonly scriptFNameTag="${scriptFileName%.*}"
@@ -91,7 +94,6 @@ readonly CLRct="\e[0m"
 readonly REDct="\e[1;31m"
 readonly GRNct="\e[1;32m"
 readonly YLWct="\e[1;33m"
-readonly BLUEct="\e[1;34m"
 readonly MGNTct="\e[1;35m"
 readonly CYANct="\e[1;36m"
 
@@ -133,7 +135,7 @@ fi
 # that survives a reboot so logs are not deleted.
 #-----------------------------------------------------
 readonly defLogDirectoryPath="/opt/var/log"
-readonly altLogDirectoryPath="/jffs/scripts/logs"
+readonly altLogDirectoryPath="${JFFS_SCRIPTS_DIR}/logs"
 
 maxLogFileSizeKB="$DEF_LogFileSizeKB"
 userMaxLogFileSize="$((maxLogFileSizeKB * 1024))"
@@ -154,11 +156,15 @@ readonly curlTmpLogFile="${TEMP_DIR}/tmpCurl_${scriptFNameTag}_$$.TMP.LOG"
 readonly curlErrLogFile="${TEMP_DIR}/tmpCurl_${scriptFNameTag}_$$.ERR.LOG"
 
 ## The shared custom email library to support email notifications ##
-readonly ADDONS_SHARED_LIBS_DIR_PATH="/jffs/addons/shared-libs"
-readonly CUSTOM_SENDEMAIL_SCRIPT_FNAME="SendEmailHandler.sh"
+readonly ADDONS_SHARED_LIBS_DIR_PATH="${JFFS_ADDONS_DIR}/shared-libs"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
-readonly CUSTOM_SENDEMAIL_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_SENDEMAIL_SCRIPT_FNAME"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
+
+## The shared custom email script to handle sending emails ##
+readonly SEND_EMAIL_SCRIPT_TNAME="SendEmailMsg"
+readonly SEND_EMAIL_SCRIPT_FNAME="${SEND_EMAIL_SCRIPT_TNAME}.sh"
+readonly SEND_EMAIL_INSTALL_PATH="${JFFS_ADDONS_DIR}/${SEND_EMAIL_SCRIPT_TNAME}.d"
+readonly SEND_EMAIL_SCRIPT_FPATH="${SEND_EMAIL_INSTALL_PATH}/$SEND_EMAIL_SCRIPT_FNAME"
 
 if [ -t 0 ] && ! tty | grep -qwi "NOT"
 then readonly isInteractive=true
@@ -283,7 +289,7 @@ _DownloadScriptFile_()
    fi
    local srcFilePathURL="${1}/$2"
    local theTempFPathDL="${TEMP_DIR}/${2}.DL.$$.TMP"
-   local theDestFName="$2"  theDestFPath="$3"
+   local theDestFName="$2"  theDestFPath="$3"  theMsgStr
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
    rm -f "$theTempFPathDL"
@@ -316,8 +322,8 @@ _DownloadScriptFile_()
            if [ -s "$curlErrLogFile" ]
            then echo ; cat "$curlErrLogFile"
            fi
-           _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Unable to download the script file [$theDestFName]"
-           _PrintMsg_ "\n[${MGNTct}${statusSTRx}${CLRct}]\n"
+           theMsgStr="${REDct}**ERROR**${CLRct}: Unable to download the script file ${REDct}${theDestFName}${CLRct} [${MGNTct}${statusSTRx}${CLRct}]"
+           _PrintMsg_ "\n${theMsgStr}\n"
            [ "$4" -lt "$urlDLMax" ] && \
            _PrintMsg_ "\nTrying again with a different URL...\n"
        fi
@@ -338,10 +344,10 @@ _DownloadCustomSendEmailScript_()
        return 1
    fi
 
-   mkdir -m 755 -p "$ADDONS_SHARED_LIBS_DIR_PATH"
-   if [ ! -d "$ADDONS_SHARED_LIBS_DIR_PATH" ]
+   mkdir -m 755 -p "$SEND_EMAIL_INSTALL_PATH"
+   if [ ! -d "$SEND_EMAIL_INSTALL_PATH" ]
    then
-       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Directory Path [$ADDONS_SHARED_LIBS_DIR_PATH] *NOT* found.\n"
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Directory Path [$SEND_EMAIL_INSTALL_PATH] *NOT* found.\n"
        return 1
    fi
 
@@ -354,25 +360,30 @@ _DownloadCustomSendEmailScript_()
    esac
 
    "$isVerboseMode" && \
-   _PrintMsg_ "\n${actionStr1} the shared email script to send email notifications...\n"
+   _PrintMsg_ "\n${actionStr1} the ${GRNct}${SEND_EMAIL_SCRIPT_FNAME}${CLRct} script to send email notifications...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
    for theScriptURL in "$CEM_LIB_GH_URL1" "$CEM_LIB_GH_URL2"
    do
        urlDLCount="$((urlDLCount + 1))"
-       if _DownloadScriptFile_ "$theScriptURL" "$CUSTOM_SENDEMAIL_SCRIPT_FNAME" "$CUSTOM_SENDEMAIL_SCRIPT_FPATH" "$urlDLCount"
+       if _DownloadScriptFile_ "$theScriptURL" "$SEND_EMAIL_SCRIPT_FNAME" "$SEND_EMAIL_SCRIPT_FPATH" "$urlDLCount"
        then
-           chmod 755 "$CUSTOM_SENDEMAIL_SCRIPT_FPATH"
+           chmod 755 "$SEND_EMAIL_SCRIPT_FPATH"
            if "$isVerboseMode" || \
               { [ "$urlDLCount" -gt 1 ] && "$doShowErrorMsgs" ; }
            then
                [ "$urlDLCount" -gt 1 ] && echo
-               _PrintMsg_ "The latest shared email script [$CUSTOM_SENDEMAIL_SCRIPT_FNAME] was ${actionStr2}.\n"
+               _PrintMsg_ "The email script ${GRNct}${SEND_EMAIL_SCRIPT_FNAME}${CLRct} was ${actionStr2}.\n"
            fi
            retCode=0
            break
        fi
    done
+
+   if [ "$retCode" -ne 0 ]
+   then
+       _PrintMsg_ "\nThe email script ${REDct}${SEND_EMAIL_SCRIPT_FNAME}${CLRct} was NOT ${actionStr2}.\n"
+   fi
    return "$retCode"
 }
 
@@ -402,10 +413,29 @@ _InstallCustomSendEmailScript_()
    if _DownloadCustomSendEmailScript_ -install "$quietARG"
    then
        [ ! -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] && \
-       "$CUSTOM_SENDEMAIL_SCRIPT_FPATH" -checkupdate
+       "$SEND_EMAIL_SCRIPT_FPATH" -checkupdate
        retCode=0
    fi
    return "$retCode"
+}
+
+#-----------------------------------------------------------#
+_CheckForSendEmailScript_()
+{
+   if [ ! -s "$SEND_EMAIL_SCRIPT_FPATH" ]
+   then
+       if ! _InstallCustomSendEmailScript_ -verbose
+       then return 1
+       fi
+   fi
+
+   if [ ! -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] || \
+      { [ $# -gt 0 ] && [ "$1" = "-checkupdate" ] ; }
+   then $SEND_EMAIL_SCRIPT_FPATH -checkupdate
+   fi
+
+   [ ! -x "$SEND_EMAIL_SCRIPT_FPATH" ] && \
+   chmod 755 "$SEND_EMAIL_SCRIPT_FPATH"
 }
 
 #-----------------------------------------------------------#
@@ -428,12 +458,20 @@ _CheckScriptVersionUpdate_()
       echo "$verNum" ; return 0
    }
 
+   _FormatVersionStr_()
+   {
+       if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+       then echo ; return 1
+       fi
+       echo "${GRNct}${1}${CLRct} [${GRNct}${2}${CLRct}]"
+   }
+
    if [ $# -gt 0 ] && echo "$1" | grep -qE "^-(quiet|veryquiet)$"
    then isVerboseMode=false ; doShowErrorMsgs=false
    fi
 
    "$isVerboseMode" && \
-   _PrintMsg_ "\nChecking for script updates...\n"
+   _PrintMsg_ "\nChecking for ${GRNct}${SCRIPT_FNAME}${CLRct} script updates...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
    for theScriptURL in "$SCRIPT_GHB_URL1" "$SCRIPT_GHB_URL2"
@@ -446,7 +484,9 @@ _CheckScriptVersionUpdate_()
    done
 
    if [ "$retCode" -ne 0 ] || [ ! -s "$theTmpFilePath" ]
-   then return 1
+   then
+       _PrintMsg_ "\nThe script ${REDct}${SCRIPT_FNAME}${CLRct} was NOT updated.\n"
+       return 1
    fi
 
    dlVersionStr="$(grep -E '^readonly SCRIPT_VERSION=' "$theTmpFilePath" | tr -d '"')"
@@ -469,14 +509,16 @@ _CheckScriptVersionUpdate_()
       [ "$dlFileVerNum" -lt "$scriptVerNum" ]
    then
        rm -f "$theTmpFilePath"
-       _PrintMsg_ "\nYou have the latest script version [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${CLRct}] installed.\n"
+       theVerStr="$(_FormatVersionStr_ "$SCRIPT_VERSION" "$SCRIPT_VERSTAG")"
+       _PrintMsg_ "You have the latest script version $theVerStr installed.\n"
        return 0
    fi
 
-   _PrintMsg_ "\nLatest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${CLRct}] is available.\n"
+   theVerStr="$(_FormatVersionStr_ "$dlVersionStr" "$dlVersTagStr")"
+   _PrintMsg_ "Latest script version update $theVerStr is available.\n"
    mv -f "$theTmpFilePath" "$theScriptFPath"
    chmod 755 "$theScriptFPath"
-   _PrintMsg_ "The script has been updated to the latest version [${GRNct}${dlVersionStr}_${dlVersTagStr}${CLRct}].\n"
+   _PrintMsg_ "The script ${GRNct}${SCRIPT_FNAME}${CLRct} was updated to the latest version ${theVerStr}.\n"
    return 0
 }
 
@@ -1216,9 +1258,9 @@ _CreateEMailContent_()
 #-----------------------------------------------------------------------#
 _SendEMailNotification_()
 {
-   if [ ! -s "$CUSTOM_SENDEMAIL_SCRIPT_FPATH" ]
+   if [ ! -s "$SEND_EMAIL_SCRIPT_FPATH" ]
    then
-       logMsg="Email script file [$CUSTOM_SENDEMAIL_SCRIPT_FNAME] *NOT* found."
+       logMsg="Email script file [$SEND_EMAIL_SCRIPT_FNAME] *NOT* found."
        _MsgToSysLog_ "$logMsg" WARN
        _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: ${logMsg}\n\n"
        _WaitForEnterKey_
@@ -1236,7 +1278,7 @@ _SendEMailNotification_()
 
    _PrintMsg_ "\nSending email notification [$1].\nPlease wait..."
 
-   $CUSTOM_SENDEMAIL_SCRIPT_FPATH -send -quiet -From="$emailSenderID" "$emailSubject" -File="$tmpEMailBodyFile" "$emailBodyTitle"
+   $SEND_EMAIL_SCRIPT_FPATH -send -quiet -From="$emailSenderID" "$emailSubject" -File="$tmpEMailBodyFile" "$emailBodyTitle"
    retCode="$?"
 
    if [ "$retCode" -eq 0 ]
@@ -2228,27 +2270,22 @@ do
    esac
 done
 
+_CheckConfigurationFile_
+_ValidateLogDirPath_ "$userLogDirectoryPath" "$prefLogDirectoryPath" "$altLogDirectoryPath"
+_CheckLogFileSize_
+
 if [ "$updateARG" = "-checkupdate" ]
 then
     _CheckScriptVersionUpdate_ "$quietARG"
-    exit $?
+    if "$isSendEmailNotificationsEnabled"
+    then _CheckForSendEmailScript_ "$updateARG"
+    fi
+    exit 0
 fi
 
 numVal=0
 numProcs=15
 duUnits="HR"
-downloadHelper=false
-readonly routerMODEL_ID="$(_GetRouterModelID_)"
-readonly routerFWversion="$(_GetCurrentFWVersion_)"
-
-if [ "$SCRIPT_BRANCH" = "master" ]
-then scriptVersInfo="$SCRIPT_VERSION"
-else scriptVersInfo="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
-fi
-
-_CheckConfigurationFile_
-_ValidateLogDirPath_ "$userLogDirectoryPath" "$prefLogDirectoryPath" "$altLogDirectoryPath"
-_CheckLogFileSize_
 
 if [ $# -gt 0 ] && [ -n "$1" ]
 then
@@ -2279,10 +2316,6 @@ then
            _SetConfigurationOption_ isSendEmailNotificationsEnabled false
            exit 0
            ;;
-        -download)
-           if [ $# -gt 1 ] && [ "$2" = "-cemdlhelper" ]
-           then downloadHelper=true ; fi
-           ;;
         -maxlogsize)
            shift ; _SetMaxLogFileSize_ "$@"
            exit 0
@@ -2308,21 +2341,12 @@ then
     esac
 fi
 
-if "$isSendEmailNotificationsEnabled"
-then
-   if [ ! -s "$CUSTOM_SENDEMAIL_SCRIPT_FPATH" ]
-   then
-       if ! _InstallCustomSendEmailScript_ -verbose
-       then exit 1
-       fi
-   fi
-   if "$downloadHelper" || \
-      [ ! -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ]
-   then $CUSTOM_SENDEMAIL_SCRIPT_FPATH -checkupdate
-   fi
+readonly routerMODEL_ID="$(_GetRouterModelID_)"
+readonly routerFWversion="$(_GetCurrentFWVersion_)"
 
-   [ ! -x "$CUSTOM_SENDEMAIL_SCRIPT_FPATH" ] && \
-   chmod 755 "$CUSTOM_SENDEMAIL_SCRIPT_FPATH"
+if [ "$SCRIPT_BRANCH" = "master" ]
+then readonly scriptVersInfo="$SCRIPT_VERSION"
+else readonly scriptVersInfo="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
 fi
 
 {
@@ -2364,6 +2388,10 @@ fi
    echo
    top -b -n1 | head -n "$((numProcs + 4))"
 } > "$tempLogFPath"
+
+if "$isSendEmailNotificationsEnabled"
+then _CheckForSendEmailScript_
+fi
 
 _CheckUsageThresholds_JFFS_
 _CheckUsageThresholds_NVRAM_
