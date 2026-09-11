@@ -7,7 +7,7 @@
 # email notifications using AMTM email configuration file.
 #---------------------------------------------------------------------
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Sep-09 [Martinski W.]
+# Last Modified: 2026-Sep-10 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -16,7 +16,7 @@ else return 0
 fi
 
 CEM_LIB_VERSION="1.0.1"
-CEM_LIB_VERSTAG="26090901"
+CEM_LIB_VERSTAG="26091023"
 CEM_TXT_VERFILE="cemVersion.txt"
 
 CEM_LIB_REPO_BRANCH="develop"   ##**TBD "master" RELEASE**##
@@ -187,7 +187,7 @@ _DownloadScriptFile_CEM_()
            statusSTRx="HTTP Status Code: $statusCODE"
        fi
        logMsgStr="**ERROR**: Unable to download the script file [$theDestFName] [${statusSTRx}]"
-       theMsgStr="${cemREDct}**ERROR**${cemCLRct}: Unable to download the script file [$theDestFName] [${cemMGNTct}${statusSTRx}${cemCLRct}]"
+       theMsgStr="${cemREDct}**ERROR**${cemCLRct}: Unable to download the script file ${cemREDct}${theDestFName}${cemCLRct} [${cemMGNTct}${statusSTRx}${cemCLRct}]"
        _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR" NOECHO
 
        if [ "$4" -eq "$urlDLMax" ] || "$showAllMsgs" || "$showWarnings"
@@ -226,6 +226,14 @@ _CheckLibraryUpdates_CEM_()
       echo "$verNum" ; return 0
    }
 
+   _FormatVersionStr_()
+   {
+       if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+       then echo ; return 1
+       fi
+       echo "${cemGRNct}${1}${cemCLRct} [${cemGRNct}${2}${cemCLRct}]"
+   }
+
    mkdir -m 755 -p "$cemAddOnsSharedLibsDirPath"
    if [ ! -d "$cemAddOnsSharedLibsDirPath" ]
    then
@@ -233,9 +241,9 @@ _CheckLibraryUpdates_CEM_()
        return 0
    fi
 
-   local theScriptFPath="$cemCustomEmailLibScriptFPath"
-   local theTmpFilePath="${CEM_TEMP_DIR}/${cemCustomEmailLibScriptFName}.$$.TMP.SH"
-   local scriptVerNum  dlFileVerNum
+   local cemScriptFPath="$cemCustomEmailLibScriptFPath"
+   local cemTmpFilePath="${CEM_TEMP_DIR}/${cemCustomEmailLibScriptFName}.$$.TMP.SH"
+   local scriptVerNum  dlFileVerNum  theVerStr
    local retCode  urlDLCount  urlDLMax
    local dlVersionStr  dlVersTagStr  scriptMD5  dlTempMD5
    local showAllMsgs="$cemIsVerboseMode"  showWarnings=true
@@ -256,28 +264,28 @@ _CheckLibraryUpdates_CEM_()
    for theScriptURL in "$CEM_LIB_SCRIPT_URL1" "$CEM_LIB_SCRIPT_URL2"
    do
        urlDLCount="$((urlDLCount + 1))"
-       if _DownloadScriptFile_CEM_ "$theScriptURL" "$cemCustomEmailLibScriptFName" "$theTmpFilePath" "$urlDLCount"
+       if _DownloadScriptFile_CEM_ "$theScriptURL" "$cemCustomEmailLibScriptFName" "$cemTmpFilePath" "$urlDLCount"
        then
            retCode=0 ; break
        fi
    done
 
-   if [ "$retCode" -ne 0 ] || [ ! -s "$theTmpFilePath" ]
+   if [ "$retCode" -ne 0 ] || [ ! -s "$cemTmpFilePath" ]
    then return 1
    fi
 
-   dlVersionStr="$(grep -E '^CEM_LIB_VERSION=' "$theTmpFilePath" | tr -d '"')"
-   dlVersTagStr="$(grep -E '^CEM_LIB_VERSTAG=' "$theTmpFilePath" | tr -d '"')"
+   dlVersionStr="$(grep -E '^CEM_LIB_VERSION=' "$cemTmpFilePath" | tr -d '"')"
+   dlVersTagStr="$(grep -E '^CEM_LIB_VERSTAG=' "$cemTmpFilePath" | tr -d '"')"
 
    if [ -z "$dlVersionStr" ] || [ -z "$dlVersTagStr" ]
    then
        _PrintMsg_ "\n${cemREDct}**ERROR**${cemCLRct}: Could NOT find the VERSION string.\n"
-       rm -f "$theTmpFilePath"
+       rm -f "$cemTmpFilePath"
        return 1
    fi
 
-   dlTempMD5="$(md5sum "$theTmpFilePath" 2>/dev/null | awk -F' ' '{print $1}')"
-   scriptMD5="$(md5sum "$theScriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
+   dlTempMD5="$(md5sum "$cemTmpFilePath" 2>/dev/null | awk -F' ' '{print $1}')"
+   scriptMD5="$(md5sum "$cemScriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
    dlVersionStr="$(echo "$dlVersionStr" | sed -e 's/.*CEM_LIB_VERSION=//;s/ .*$//')"
    dlVersTagStr="$(echo "$dlVersTagStr" | sed -e 's/.*CEM_LIB_VERSTAG=//;s/ .*$//')"
    dlFileVerNum="$(_VersionStrToNum_ "$dlVersionStr")"
@@ -287,16 +295,22 @@ _CheckLibraryUpdates_CEM_()
       [ "$dlFileVerNum" -lt "$scriptVerNum" ]
    then
        retCode=1
-       "$showAllMsgs" && \
-       _PrintMsg_CEM_ "You have the latest email library script version [${cemGRNct}${CEM_LIB_VERSION}_${CEM_LIB_VERSTAG}${cemCLRct}] installed.\n"
+       if "$showAllMsgs"
+       then
+           theVerStr="$(_FormatVersionStr_ "$CEM_LIB_VERSION" "$CEM_LIB_VERSTAG")"
+           _PrintMsg_CEM_ "You have the latest email library script version $theVerStr installed.\n"
+       fi
    else
        retCode=0
        _DoReInit_CEM_
-       "$showAllMsgs" && \
-       _PrintMsg_CEM_ "New shared email library script version [${cemGRNct}${dlVersionStr}_${dlVersTagStr}${cemCLRct}] is available.\n"
+       if "$showAllMsgs"
+       then
+           theVerStr="$(_FormatVersionStr_ "$dlVersionStr" "$dlVersTagStr")"
+           _PrintMsg_CEM_ "New shared email library script version $theVerStr is available.\n"
+       fi
    fi
 
-   rm -f "$theTmpFilePath"
+   rm -f "$cemTmpFilePath"
    return "$retCode"
 }
 
