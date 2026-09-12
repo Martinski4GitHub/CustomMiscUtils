@@ -13,12 +13,12 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Feb-19 [Martinski W.]
-# Last Modified: 2026-Sep-10 [Martinski W.]
+# Last Modified: 2026-Sep-12 [Martinski W.]
 #####################################################################
 set -u
 
 readonly SCRIPT_VERSION="0.5.0"
-readonly SCRIPT_VERSTAG="26091023"
+readonly SCRIPT_VERSTAG="26091200"
 readonly SCRIPT_TNAME="SendEmailMsg"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
@@ -136,6 +136,11 @@ To uninstall the script and its configuration file:
 To check for and install the latest script version update:
 
    ${GRNct}$SCRIPT_TNAME ${CYANct}-checkupdate${CLRct}
+
+
+To force installation of the latest script version update:
+
+   ${GRNct}$SCRIPT_TNAME ${CYANct}-forceupdate${CLRct}
 
 
 To switch to the production/stable version of the script:
@@ -303,6 +308,7 @@ Miscellaneous functions:
    ${GRNct}$SCRIPT_TNAME ${CYANct}-install${CLRct}
    ${GRNct}$SCRIPT_TNAME ${CYANct}-uninstall${CLRct}
    ${GRNct}$SCRIPT_TNAME ${CYANct}-checkupdate${CLRct}
+   ${GRNct}$SCRIPT_TNAME ${CYANct}-forceupdate${CLRct}
    ${GRNct}$SCRIPT_TNAME ${CYANct}-stable${CLRct}
    ${GRNct}$SCRIPT_TNAME ${CYANct}-develop${CLRct}
    ${GRNct}$SCRIPT_TNAME ${CYANct}-showconf${CLRct}
@@ -398,7 +404,7 @@ _AcquireEmailMutexFLock_()
            ! echo "$procIDof" | grep -qow "$procIDno"
         then
             _PrintMsg_ "Stale Lock Found. Resetting Lock file..."
-            _ReleaseMutexFLock_
+            _ReleaseEmailMutexFLock_
         fi
     fi
 
@@ -489,7 +495,7 @@ _ScriptSymbolicLink_()
 _DoScriptUpdate_()
 {
    if [ $# -eq 0 ] || [ -z "$1" ] || \
-      ! echo "$1" | grep -qE "^-(check|force)$"
+      ! echo "$1" | grep -qE '^-(check|force)$'
    then return 1
    fi
    _AcquireEmailMutexFLock_
@@ -625,7 +631,7 @@ _DownloadScriptFile_()
 _DownloadCustomEmailLibraryScript_()
 {
    if [ $# -eq 0 ] || [ -z "$1" ] || \
-      ! echo "$1" | grep -qE "^-(update|install|force)$"
+      ! echo "$1" | grep -qE '^-(update|install|force)$'
    then
        _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: NO valid parameter was provided to download library file.\n"
        return 1
@@ -639,20 +645,23 @@ _DownloadCustomEmailLibraryScript_()
    fi
 
    local actionStr1  actionStr2  retCode  urlDLCount  urlDLMax
-   local isVerboseMode="$cemIsVerboseMode"  updateType=""
+   local isVerboseMode="$cemIsVerboseMode"  updateType  theVerStr
 
    case "$1" in
        -force)
            updateType="force"
-           actionStr1="Updating" ; actionStr2="updated"
+           actionStr1="Updating"
+           actionStr2="updated to the latest version"
            ;;
        -update)
            updateType="check"
-           actionStr1="Updating" ; actionStr2="updated"
+           actionStr1="Updating"
+           actionStr2="updated to the latest version"
            ;;
        -install)
            updateType="check"
-           actionStr1="Installing" ; actionStr2="installed"
+           actionStr1="Installing"
+           actionStr2="installed, version"
            ;;
    esac
 
@@ -672,7 +681,8 @@ _DownloadCustomEmailLibraryScript_()
               { [ "$urlDLCount" -gt 1 ] && "$doShowErrorMsgs" ; }
            then
                [ "$urlDLCount" -gt 1 ] && echo
-               _PrintMsg_ "The shared email library script ${GRNct}${CUSTOM_EMAIL_LIB_SCRIPT_FNAME}${CLRct} was ${actionStr2}.\n"
+               theVerStr="${GRNct}${CEM_LIB_VERSION}${CLRct} [${GRNct}${CEM_LIB_VERSTAG}${CLRct}]"
+               _PrintMsg_ "The shared email library script ${GRNct}${CUSTOM_EMAIL_LIB_SCRIPT_FNAME}${CLRct} was ${actionStr2} ${theVerStr}.\n"
            fi
            retCode=0
            break
@@ -836,7 +846,7 @@ _IsOptionalEmailArg_()
 _IsValidActionArg_()
 {
    if echo "$1" | \
-      grep -qE '^-(send|test|install|uninstall|stable|develop|checkupdate|showconf|version|getvers)$'
+      grep -qE '^-(send|test|install|uninstall|checkupdate|forceupdate|stable|develop|showconf|version|getvers)$'
    then return 0
    else return 1
    fi
@@ -944,7 +954,7 @@ _Send_Email_TEST_()
 
 #-----------------------------------------------------------#
 showUsage=false
-if [ $# -eq 0 ] || [ -z "$1" ] || echo "$1" | grep -qE "^[-]?help$"
+if [ $# -eq 0 ] || [ -z "$1" ] || echo "$1" | grep -qE '^[-]?help$'
 then
     showUsage=true
 elif ! _IsValidActionArg_ "$1"
@@ -1044,13 +1054,21 @@ then
     _UpdateToDevelopBranch_
     exit 0
 elif [ "$action" = "-checkupdate" ] || \
-   [ ! -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ]
+     [ "$action" = "-forceupdate" ] || \
+     [ ! -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ]
 then
     if [ -z "${cemIsVerboseMode:+xSETx}" ]
     then cemIsVerboseMode=true
     fi
-    _DoScriptUpdate_ -check
-    if [ "$action" = "-checkupdate" ]
+    updateType=""
+    if [ "$action" = "-forceupdate" ]
+    then updateType="-force"
+    else updateType="-check"
+    fi
+    _DoScriptUpdate_ "$updateType"
+
+    if [ "$action" = "-checkupdate" ] || \
+       [ "$action" = "-forceupdate" ]
     then exit 0
     fi
 fi
