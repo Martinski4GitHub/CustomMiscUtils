@@ -6,8 +6,9 @@
 # Custom miscellaneous definitions and functions to send
 # email notifications using AMTM email configuration file.
 #---------------------------------------------------------------------
+# Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Sep-10 [Martinski W.]
+# Last Modified: 2026-Sep-12 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -16,7 +17,7 @@ else return 0
 fi
 
 CEM_LIB_VERSION="1.0.1"
-CEM_LIB_VERSTAG="26091023"
+CEM_LIB_VERSTAG="26091223"
 CEM_TXT_VERFILE="cemVersion.txt"
 
 CEM_LIB_REPO_BRANCH="develop"   ##**TBD "master" RELEASE**##
@@ -83,7 +84,7 @@ amtmEMailPswdFileCEM="${amtmEMailDirPathCEM}/emailpw.enc"
 amtmIsEMailConfigFileEnabled=false
 cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
 
-if [ -t 0 ] && ! tty | grep -qwi "NOT"
+if [ -t 0 ] && ! tty | grep -qwi 'NOT'
 then
     cemIsInteractive=true
 else
@@ -120,7 +121,7 @@ _LogMsg_CEM_()
    then return 1
    fi
    if [ $# -gt 1 ] && [ -n "$2" ] && \
-      echo "$2" | grep -qE "^[1-6]$"
+      echo "$2" | grep -qE '^[1-6]$'
    then cemLogPrioNum="$2"
    else cemLogPrioNum="$cemSysLogNOTIC"
    fi
@@ -156,19 +157,19 @@ _DownloadScriptFile_CEM_()
    then return 1
    fi
    local srcFilePathURL="${1}/$2"
-   local theTempFPathDL="${CEM_TEMP_DIR}/${2}.DL.$$.TMP"
+   local tempFilePathDL="${CEM_TEMP_DIR}/${2}.DL.$$.TMP"
    local theDestFName="$2"  theDestFPath="$3"
    local theMsgStr  logMsgStr
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
-   rm -f "$theTempFPathDL"
+   rm -f "$tempFilePathDL"
    printf '' > "$cemErrCurlLogFile"
    printf '' > "$cemTmpCurlLogFile"
 
    /usr/sbin/curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
    --connect-timeout 30 --max-time 60 \
    -w "${cemHTTPstatusStr}: %{http_code}\n" --stderr "$cemErrCurlLogFile" \
-   "$srcFilePathURL" --output "$theTempFPathDL" >> "$cemTmpCurlLogFile"
+   "$srcFilePathURL" --output "$tempFilePathDL" >> "$cemTmpCurlLogFile"
    curlRetCode="$?"
 
    statusCODE="$curlRetCode"
@@ -176,9 +177,9 @@ _DownloadScriptFile_CEM_()
    httpStatusSTR="$(grep -oE "${cemHTTPstatusStr}: [4-5][0-9]{2,}" "$cemTmpCurlLogFile")"
 
    if [ "$curlRetCode" -eq 0 ] && \
-      [ -z "$httpStatusSTR" ] && [ -s "$theTempFPathDL" ]
+      [ -z "$httpStatusSTR" ] && [ -s "$tempFilePathDL" ]
    then
-       mv -f "$theTempFPathDL" "$theDestFPath"
+       mv -f "$tempFilePathDL" "$theDestFPath"
        dos2unix "$theDestFPath" ; chmod 644 "$theDestFPath"
    else
        if [ "$curlRetCode" -eq 0 ] && [ -n "$httpStatusSTR" ]
@@ -199,7 +200,7 @@ _DownloadScriptFile_CEM_()
            [ "$4" -lt "$urlDLMax" ] && \
            _PrintMsg_CEM_ "\nTrying again with a different URL...\n"
        fi
-       rm -f "$theTempFPathDL"
+       rm -f "$tempFilePathDL"
    fi
 
    rm -f "$cemErrCurlLogFile" "$cemTmpCurlLogFile"
@@ -250,7 +251,7 @@ _CheckLibraryUpdates_CEM_()
 
    if [ $# -gt 1 ]
    then
-       if echo "$2" | grep -qE "^[-]?quiet$"
+       if echo "$2" | grep -qE '^[-]?quiet$'
        then showAllMsgs=false
        elif [ "$2" = "-veryquiet" ]
        then showAllMsgs=false ; showWarnings=false
@@ -446,7 +447,7 @@ _CreateEMailContent_CEM_()
     then
         if [ -n "$emailBodyTitle" ]
         then
-            ! echo "$emailBodyTitle" | grep -qE "^[<]h[1-5][>].*[<]/h[1-5][>]$" && \
+            ! echo "$emailBodyTitle" | grep -qE '^[<]h[1-5][>].*[<]/h[1-5][>]$' && \
             emailBodyTitle="<h2>${emailBodyTitle}</h2>"
         fi
     else
