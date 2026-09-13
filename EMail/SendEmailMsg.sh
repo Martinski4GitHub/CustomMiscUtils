@@ -17,8 +17,8 @@
 #####################################################################
 set -u
 
-readonly SCRIPT_VERSION="0.5.0"
-readonly SCRIPT_VERSTAG="26091200"
+readonly SCRIPT_VERSION="0.8.0"
+readonly SCRIPT_VERSTAG="26091223"
 readonly SCRIPT_TNAME="SendEmailMsg"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
@@ -75,7 +75,7 @@ readonly pLogNOTIC=5
 readonly pLogINFOR=6
 readonly logTagStr="${scriptFNameTag}_[$$]"
 
-if [ -t 0 ] && ! tty | grep -qwi "NOT"
+if [ -t 0 ] && ! tty | grep -qwi 'NOT'
 then readonly isInteractive=true
 else readonly isInteractive=false
 fi
@@ -353,7 +353,7 @@ _LogMsg_()
    local logPrioNum
 
    if [ $# -gt 1 ] && [ -n "$2" ] && \
-      echo "$2" | grep -qE "^[1-6]$"
+      echo "$2" | grep -qE '^[1-6]$'
    then logPrioNum="$2"
    else logPrioNum="$pLogNOTIC"
    fi
@@ -576,20 +576,21 @@ _DownloadScriptFile_()
    if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
    then return 1
    fi
+
    local srcFilePathURL="${1}/$2"
-   local theTempFPathDL="${TEMP_DIR}/${2}.DL.$$.TMP"
+   local tempFilePathDL="${TEMP_DIR}/${2}.DL.$$.TMP"
    local theDestFName="$2"  theDestFPath="$3"
    local theMsgStr  logMsgStr
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
-   rm -f "$theTempFPathDL"
+   rm -f "$tempFilePathDL"
    printf '' > "$curlErrLogFile"
    printf '' > "$curlTmpLogFile"
 
    curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
    --connect-timeout 30 --max-time 60 \
    -w "${curlHTTPstatusStr}: %{http_code}\n" --stderr "$curlErrLogFile" \
-   "$srcFilePathURL" --output "$theTempFPathDL" >> "$curlTmpLogFile"
+   "$srcFilePathURL" --output "$tempFilePathDL" >> "$curlTmpLogFile"
    curlRetCode="$?"
 
    statusCODE="$curlRetCode"
@@ -597,9 +598,9 @@ _DownloadScriptFile_()
    httpStatusSTR="$(grep -oE "${curlHTTPstatusStr}: [4-5][0-9]{2,}" "$curlTmpLogFile")"
 
    if [ "$curlRetCode" -eq 0 ] && \
-      [ -z "$httpStatusSTR" ] && [ -s "$theTempFPathDL" ]
+      [ -z "$httpStatusSTR" ] && [ -s "$tempFilePathDL" ]
    then
-       mv -f "$theTempFPathDL" "$theDestFPath"
+       mv -f "$tempFilePathDL" "$theDestFPath"
        dos2unix "$theDestFPath" ; chmod 644 "$theDestFPath"
    else
        if [ "$curlRetCode" -eq 0 ] && [ -n "$httpStatusSTR" ]
@@ -620,7 +621,7 @@ _DownloadScriptFile_()
            [ "$4" -lt "$urlDLMax" ] && \
            _PrintMsg_ "\nTrying again with a different URL...\n"
        fi
-       rm -f "$theTempFPathDL"
+       rm -f "$tempFilePathDL"
    fi
 
    rm -f "$curlErrLogFile" "$curlTmpLogFile"
