@@ -8,7 +8,7 @@
 #---------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Sep-12 [Martinski W.]
+# Last Modified: 2026-Sep-13 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -17,12 +17,17 @@ else return 0
 fi
 
 CEM_LIB_VERSION="1.0.1"
-CEM_LIB_VERSTAG="26091223"
+CEM_LIB_VERSTAG="26091323"
 CEM_TXT_VERFILE="cemVersion.txt"
 
-CEM_LIB_REPO_BRANCH="develop"   ##**TBD "master" RELEASE**##
-CEM_LIB_SCRIPT_URL2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/${CEM_LIB_REPO_BRANCH}/EMail"
-CEM_LIB_SCRIPT_URL1="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${CEM_LIB_REPO_BRANCH}/EMail"
+CEM_LIB_REPO_BRANCH="develop"   ##**SET to "master" for RELEASE**##
+CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
+CEM_LIB_REPO_URL_BASE1="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils"
+CEM_LIB_SCRIPT_GH_URL1="${CEM_LIB_REPO_URL_BASE1}/${CEM_LIB_REPO_BRANCH}/EMail"
+CEM_LIB_SCRIPT_GH_URL2="${CEM_LIB_REPO_URL_BASE2}/${CEM_LIB_REPO_BRANCH}/EMail"
+
+CEM_TEMP_DIR="/tmp/var/tmp"
+CEM_ADDONS_DIR="/jffs/addons"
 
 if [ -z "${cemIsVerboseMode:+xSETx}" ]
 then cemIsVerboseMode=true ; fi
@@ -44,15 +49,16 @@ cemScriptDirPath="$(/usr/bin/dirname "$0")"
 cemScriptFileName="${0##*/}"
 cemScriptFNameTag="${cemScriptFileName%.*}"
 
-cemAddOnsSharedLibsDirPath="/jffs/addons/shared-libs"
+# The shared Custom Email Library Script #
+cemAddOnsSharedLibsDirPath="${CEM_ADDONS_DIR}/shared-libs"
 cemCustomEmailLibScriptFName="CustomEMailFunctions.lib.sh"
 cemCustomEmailLibScriptFPath="${cemAddOnsSharedLibsDirPath}/$cemCustomEmailLibScriptFName"
 
-CEM_TEMP_DIR="/tmp/var/tmp"
 cemHTTPstatusStr="HTTP_Status_Code"
 cemTmpCurlLogFile="${CEM_TEMP_DIR}/tmpEMail_${cemScriptFNameTag}_$$.TMP.LOG"
 cemErrCurlLogFile="${CEM_TEMP_DIR}/tmpEMail_${cemScriptFNameTag}_$$.ERR.LOG"
 cemTmpEMailContent="${CEM_TEMP_DIR}/tmpEMailContent_${cemScriptFNameTag}_$$.TXT"
+cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
 
 cemNvramInitUSleep=10
 cemNvramWaitUSleep=50
@@ -77,13 +83,6 @@ cemGRNct="\e[1;32m"
 cemYLWct="\e[1;33m"
 cemMGNTct="\e[1;35m"
 
-amtmEMailDirPathCEM="/jffs/addons/amtm/mail"
-amtmEMailConfFileCEM="${amtmEMailDirPathCEM}/email.conf"
-amtmEMailPswdFileCEM="${amtmEMailDirPathCEM}/emailpw.enc"
-
-amtmIsEMailConfigFileEnabled=false
-cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
-
 if [ -t 0 ] && ! tty | grep -qwi 'NOT'
 then
     cemIsInteractive=true
@@ -92,15 +91,21 @@ else
     cemIsVerboseMode=false
 fi
 
+# AMTM Email Configuration file with user-defined settings #
+amtmEMailDirPathCEM="${CEM_ADDONS_DIR}/amtm/mail"
+amtmEMailConfFileCEM="${amtmEMailDirPathCEM}/email.conf"
+amtmEMailPswdFileCEM="${amtmEMailDirPathCEM}/emailpw.enc"
+amtmIsEMailConfigFileEnabled=false
+
 #------------------------------------#
-# AMTM email configuration variables #
+# AMTM Email Configuration variables #
 #------------------------------------#
 FROM_NAME=""  FROM_ADDRESS=""
 TO_NAME=""  TO_ADDRESS=""
 USERNAME=""  SMTP=""  PORT=""  PROTOCOL=""
 PASSWORD=""  emailPwEnc=""
 
-# Custom Additions ##
+# Custom options from Email Library Script #
 CC_NAME=""  CC_ADDRESS=""
 
 #-----------------------------------------------------------#
@@ -262,7 +267,7 @@ _CheckLibraryUpdates_CEM_()
    _PrintMsg_CEM_ "\nChecking for shared email library script updates...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
-   for theScriptURL in "$CEM_LIB_SCRIPT_URL1" "$CEM_LIB_SCRIPT_URL2"
+   for theScriptURL in "$CEM_LIB_SCRIPT_GH_URL1" "$CEM_LIB_SCRIPT_GH_URL2"
    do
        urlDLCount="$((urlDLCount + 1))"
        if _DownloadScriptFile_CEM_ "$theScriptURL" "$cemCustomEmailLibScriptFName" "$cemTmpFilePath" "$urlDLCount"
