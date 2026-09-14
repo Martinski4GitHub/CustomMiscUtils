@@ -8,7 +8,7 @@
 #---------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Sep-13 [Martinski W.]
+# Last Modified: 2026-Sep-14 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -17,8 +17,7 @@ else return 0
 fi
 
 CEM_LIB_VERSION="1.0.1"
-CEM_LIB_VERSTAG="26091323"
-CEM_TXT_VERFILE="cemVersion.txt"
+CEM_LIB_VERSTAG="26091400"
 
 CEM_LIB_REPO_BRANCH="develop"   ##**SET to "master" for RELEASE**##
 CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
@@ -304,7 +303,7 @@ _CheckLibraryUpdates_CEM_()
        if "$showAllMsgs"
        then
            theVerStr="$(_FormatVersionStr_ "$CEM_LIB_VERSION" "$CEM_LIB_VERSTAG")"
-           _PrintMsg_CEM_ "You have the latest email library script version $theVerStr installed.\n"
+           _PrintMsg_CEM_ "You have the latest email library script version $theVerStr installed.\n\n"
        fi
    else
        retCode=0
@@ -312,7 +311,7 @@ _CheckLibraryUpdates_CEM_()
        if "$showAllMsgs"
        then
            theVerStr="$(_FormatVersionStr_ "$dlVersionStr" "$dlVersTagStr")"
-           _PrintMsg_CEM_ "New shared email library script version $theVerStr is available.\n"
+           _PrintMsg_CEM_ "New shared email library script version $theVerStr is available.\n\n"
        fi
    fi
 
