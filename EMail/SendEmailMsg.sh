@@ -13,12 +13,12 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Feb-19 [Martinski W.]
-# Last Modified: 2026-Sep-12 [Martinski W.]
+# Last Modified: 2026-Sep-13 [Martinski W.]
 #####################################################################
 set -u
 
 readonly SCRIPT_VERSION="0.8.0"
-readonly SCRIPT_VERSTAG="26091223"
+readonly SCRIPT_VERSTAG="26091323"
 readonly SCRIPT_TNAME="SendEmailMsg"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
@@ -32,7 +32,7 @@ readonly scriptFNameTag="${scriptFileName%.*}"
 readonly JFFS_ADDONS_DIR="/jffs/addons"
 readonly JFFS_SCRIPTS_DIR="/jffs/scripts"
 
-## The shared custom email library script to support email notifications ##
+## The shared Custom Email Library Script to support email notifications ##
 readonly ADDONS_SHARED_LIBS_DIR_PATH="${JFFS_ADDONS_DIR}/shared-libs"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
@@ -45,7 +45,7 @@ readonly theScriptSLink="${JFFS_SCRIPTS_DIR}/$SCRIPT_TNAME"
 readonly SCRIPT_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
 readonly SCRIPT_URL_BASE1="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils"
 
-SCRIPT_GH_BRANCH="develop"   ##**TBD "master" RELEASE**##
+SCRIPT_GH_BRANCH="develop"   ##**SET to "master" for RELEASE**##
 SCRIPT_URL_REPO1="${SCRIPT_URL_BASE1}/${SCRIPT_GH_BRANCH}/EMail"
 SCRIPT_URL_REPO2="${SCRIPT_URL_BASE2}/${SCRIPT_GH_BRANCH}/EMail"
 
@@ -859,7 +859,7 @@ _IsValidActionArg_()
 #       the file containing the Email Body Message.
 # ARG3: Email Body Title string [OPTIONAL].
 #-----------------------------------------------------------#
-_SendEMail_()
+_SendEMailMsg_()
 {
    if [ -z "${amtmIsEMailConfigFileEnabled:+xSETx}" ]
    then
@@ -946,7 +946,7 @@ _Send_Email_TEST_()
        printf " is working well using the \"<b>${scriptFNameTag}</b>\" shell script.\n\n"
     } > "$emailBodyTestFPath"
 
-    _SendEMail_ "$emailSubject" -File="$emailBodyTestFPath" "$emailBodyTitle"
+    _SendEMailMsg_ "$emailSubject" -File="$emailBodyTestFPath" "$emailBodyTitle"
     retCode="$?"
 
     rm -f "$emailBodyTestFPath"
@@ -1100,7 +1100,7 @@ then
         _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: INSUFFICIENT number of arguments.\n"
         _PressAnyKey_ ; _ShowUsageShort_
     else
-        _SendEMail_ "$@"
+        _SendEMailMsg_ "$@"
         exit "$?"
     fi
 fi
