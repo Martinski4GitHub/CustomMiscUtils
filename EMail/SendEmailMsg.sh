@@ -13,12 +13,12 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Feb-19 [Martinski W.]
-# Last Modified: 2026-Sep-13 [Martinski W.]
+# Last Modified: 2026-Sep-15 [Martinski W.]
 #####################################################################
 set -u
 
 readonly SCRIPT_VERSION="0.8.0"
-readonly SCRIPT_VERSTAG="26091323"
+readonly SCRIPT_VERSTAG="26091500"
 readonly SCRIPT_TNAME="SendEmailMsg"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
@@ -32,7 +32,13 @@ readonly scriptFNameTag="${scriptFileName%.*}"
 readonly JFFS_ADDONS_DIR="/jffs/addons"
 readonly JFFS_SCRIPTS_DIR="/jffs/scripts"
 
-## The shared Custom Email Library Script to support email notifications ##
+# The shared AMTM Email Configuration file with user-defined settings #
+readonly AMTM_Mail_Dir_Path="${JFFS_ADDONS_DIR}/amtm/mail"
+readonly AMTM_Mail_Conf_File="${AMTM_Mail_Dir_Path}/email.conf"
+readonly AMTM_Mail_Pswd_File="${AMTM_Mail_Dir_Path}/emailpw.enc"
+isEmailConfigEnabledInAMTM=false
+
+## The shared Custom Email Library Script to send email notifications ##
 readonly ADDONS_SHARED_LIBS_DIR_PATH="${JFFS_ADDONS_DIR}/shared-libs"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
@@ -435,6 +441,44 @@ _DOStoUNIX_()
 }
 
 #-----------------------------------------------------------#
+_CheckEmailConfigFileFromAMTM_()
+{
+   local msgType
+   if [ $# -gt 0 ] && [ "$1" = "-check" ]
+   then msgType="${REDct}**ERROR**${CLRct}"
+   else msgType="${REDct}*WARNING*${CLRct}"
+   fi
+   isEmailConfigEnabledInAMTM=false
+
+   if [ ! -s "$AMTM_Mail_Conf_File" ] || [ ! -s "$AMTM_Mail_Pswd_File" ]
+   then
+       _PrintMsg_ "\n${msgType}: Unable to send email notifications."
+       _PrintMsg_ "\n${MGNTct}AMTM email configuration file has not been set up.${CLRct}\n"
+       return 1
+   fi
+
+   # AMTM Email Configuration file variables #
+   FROM_NAME=""  TO_NAME=""  FROM_ADDRESS=""  TO_ADDRESS=""
+   USERNAME=""  SMTP=""  PORT=""  PROTOCOL=""
+   PASSWORD=""  emailPwEnc=""
+
+   . "$AMTM_Mail_Conf_File"
+
+   if [ -z "$TO_NAME" ] || [ -z "$USERNAME" ] || \
+      [ -z "$FROM_ADDRESS" ] || [ -z "$TO_ADDRESS" ] || \
+      [ -z "$SMTP" ] || [ -z "$PORT" ] || [ -z "$PROTOCOL" ] || \
+      [ -z "$emailPwEnc" ] || [ "$PASSWORD" = "PUT YOUR PASSWORD HERE" ]
+   then
+       _PrintMsg_ "\n${msgType}: Unable to send email notifications."
+       _PrintMsg_ "\n${MGNTct}Some AMTM email configuration variables are found empty.${CLRct}\n"
+       return 1
+   fi
+
+   isEmailConfigEnabledInAMTM=true
+   return 0
+}
+
+#-----------------------------------------------------------#
 _CheckScriptInstallation_()
 {
    if [ -d "$SCRIPT_INSTALL_PATH" ] && \
@@ -442,7 +486,7 @@ _CheckScriptInstallation_()
       [ -s "$SCRIPT_CONFIG_FPATH" ]
    then return 0
    fi
-   _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Script [$SCRIPT_FNAME] is NOT installed.\n\n"
+   _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Script [$SCRIPT_FNAME] is NOT properly set up.\n\n"
    return 1
 }
 
@@ -549,6 +593,8 @@ _ScriptInstallation_()
    then echo
    else _PrintMsg_ "Command to run the script: ${GRNct}${theScriptSLink}${CLRct}\n"
    fi
+
+   _CheckEmailConfigFileFromAMTM_ -install
    _PressAnyKey_ ; _ShowUsageShort_
    return 0
 }
@@ -943,7 +989,7 @@ _Send_Email_TEST_()
 
     {
        printf "\nThis is a TEST to check and verify if sending email notifications"
-       printf " is working well using the \"<b>${scriptFNameTag}</b>\" shell script.\n\n"
+       printf " is working well using the \"<b>${SCRIPT_TNAME}</b>\" script tool.\n\n"
     } > "$emailBodyTestFPath"
 
     _SendEMailMsg_ "$emailSubject" -File="$emailBodyTestFPath" "$emailBodyTitle"
@@ -1074,12 +1120,13 @@ then
     fi
 fi
 
+! _CheckEmailConfigFileFromAMTM_ -check && exit 1
 . "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
 
 if [ "$action" = "-test" ]
 then
     emailSubjectSTR="TEST Email"
-    emailBodyTITLEx="TESTING Email Notification"
+    emailBodyTITLEx="TESTING Email Notifications"
 
     if [ -z "$emailSenderID" ]
     then emailSenderID="Email_TEST"
