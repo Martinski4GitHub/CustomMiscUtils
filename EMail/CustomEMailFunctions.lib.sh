@@ -8,7 +8,7 @@
 #---------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Sep-14 [Martinski W.]
+# Last Modified: 2026-Sep-17 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -17,7 +17,7 @@ else return 0
 fi
 
 CEM_LIB_VERSION="1.0.1"
-CEM_LIB_VERSTAG="26091400"
+CEM_LIB_VERSTAG="26091723"
 
 CEM_LIB_REPO_BRANCH="develop"   ##**SET to "master" for RELEASE**##
 CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
@@ -54,9 +54,9 @@ cemCustomEmailLibScriptFName="CustomEMailFunctions.lib.sh"
 cemCustomEmailLibScriptFPath="${cemAddOnsSharedLibsDirPath}/$cemCustomEmailLibScriptFName"
 
 cemHTTPstatusStr="HTTP_Status_Code"
-cemTmpCurlLogFile="${CEM_TEMP_DIR}/tmpEMail_${cemScriptFNameTag}_$$.TMP.LOG"
-cemErrCurlLogFile="${CEM_TEMP_DIR}/tmpEMail_${cemScriptFNameTag}_$$.ERR.LOG"
-cemTmpEMailContent="${CEM_TEMP_DIR}/tmpEMailContent_${cemScriptFNameTag}_$$.TXT"
+cemTmpCurlLogFPath="${CEM_TEMP_DIR}/tmpEMailCurl_${cemScriptFNameTag}_$$.TMP.LOG"
+cemErrCurlLogFPath="${CEM_TEMP_DIR}/tmpEMailCurl_${cemScriptFNameTag}_$$.ERR.LOG"
+cemTmpEMailContent="${CEM_TEMP_DIR}/tmpEMailBodyC_${cemScriptFNameTag}_$$.TXT"
 cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
 
 cemNvramInitUSleep=10
@@ -167,18 +167,18 @@ _DownloadScriptFile_CEM_()
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
    rm -f "$tempFilePathDL"
-   printf '' > "$cemErrCurlLogFile"
-   printf '' > "$cemTmpCurlLogFile"
+   printf '' > "$cemErrCurlLogFPath"
+   printf '' > "$cemTmpCurlLogFPath"
 
    /usr/sbin/curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
    --connect-timeout 30 --max-time 60 \
-   -w "${cemHTTPstatusStr}: %{http_code}\n" --stderr "$cemErrCurlLogFile" \
-   "$srcFilePathURL" --output "$tempFilePathDL" >> "$cemTmpCurlLogFile"
+   -w "${cemHTTPstatusStr}: %{http_code}\n" --stderr "$cemErrCurlLogFPath" \
+   "$srcFilePathURL" --output "$tempFilePathDL" >> "$cemTmpCurlLogFPath"
    curlRetCode="$?"
 
    statusCODE="$curlRetCode"
    statusSTRx="Curl Status Code: $curlRetCode"
-   httpStatusSTR="$(grep -oE "${cemHTTPstatusStr}: [4-5][0-9]{2,}" "$cemTmpCurlLogFile")"
+   httpStatusSTR="$(grep -oE "${cemHTTPstatusStr}: [4-5][0-9]{2,}" "$cemTmpCurlLogFPath")"
 
    if [ "$curlRetCode" -eq 0 ] && \
       [ -z "$httpStatusSTR" ] && [ -s "$tempFilePathDL" ]
@@ -197,8 +197,8 @@ _DownloadScriptFile_CEM_()
 
        if [ "$4" -eq "$urlDLMax" ] || "$showAllMsgs" || "$showWarnings"
        then
-           if [ -s "$cemErrCurlLogFile" ]
-           then echo ; cat "$cemErrCurlLogFile"
+           if [ -s "$cemErrCurlLogFPath" ]
+           then echo ; cat "$cemErrCurlLogFPath"
            fi
            _PrintMsg_CEM_ "\n${theMsgStr}\n"
            [ "$4" -lt "$urlDLMax" ] && \
@@ -207,7 +207,7 @@ _DownloadScriptFile_CEM_()
        rm -f "$tempFilePathDL"
    fi
 
-   rm -f "$cemErrCurlLogFile" "$cemTmpCurlLogFile"
+   rm -f "$cemErrCurlLogFPath" "$cemTmpCurlLogFPath"
    return "$statusCODE"
 }
 
@@ -434,7 +434,7 @@ _CreateEMailContent_CEM_()
     fi
     local emailBodyMsge  emailBodyFile  emailBodyTitle=""
 
-    rm -f "$cemTmpEMailContent"
+    printf '' > "$cemTmpEMailContent"
 
     if ! echo "$2" | grep -qE '^-F=.+'
     then
@@ -459,32 +459,28 @@ _CreateEMailContent_CEM_()
         emailBodyTitle="$(echo "$emailBodyTitle" | sed 's/[<]h[1-5][>]//g ; s/[<]\/h[1-5][>]//g')"
     fi
 
-    if [ -n "$CC_NAME" ] && [ -n "$CC_ADDRESS" ]
-    then
-        CC_ADDRESS_ARG="--mail-rcpt $CC_ADDRESS"
-        CC_ADDRESS_STR="\"${CC_NAME}\" <$CC_ADDRESS>"
-    fi
-
-    ## Header-1 ##
+    ## Header-1a ##
     cat <<EOF > "$cemTmpEMailContent"
 From: "$FROM_NAME" <$FROM_ADDRESS>
 To: "$TO_NAME" <$TO_ADDRESS>
 EOF
 
-    [ -n "$CC_ADDRESS_STR" ] && \
-    printf "Cc: %s\n" "$CC_ADDRESS_STR" >> "$cemTmpEMailContent"
+    [ -n "$CC_ADDRESS_OK" ] && \
+    printf "Cc: \"$CC_NAME\" <$CC_ADDRESS>\n" >> "$cemTmpEMailContent"
 
-    ## Header-2 ##
+    ## Header-1b ##
     cat <<EOF >> "$cemTmpEMailContent"
 Subject: $1
 Date: $(date -R)
 EOF
 
+    ## Formatting ##
     if "$cemIsFormatHTML"
     then
         cat <<EOF >> "$cemTmpEMailContent"
 MIME-Version: 1.0
 Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
 Content-Disposition: inline
 
 <!DOCTYPE html><html>
@@ -494,16 +490,17 @@ Content-Disposition: inline
 EOF
     else
         cat <<EOF >> "$cemTmpEMailContent"
+MIME-Version: 1.0
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 Content-Disposition: inline
 
 EOF
         [ -n "$emailBodyTitle" ] && \
-        printf "%s\n\n" "$emailBodyTitle" >> "$cemTmpEMailContent"
+        printf "%s\n" "$emailBodyTitle" >> "$cemTmpEMailContent"
     fi
 
-    ## Body ##
+    ## Email Body Message ##
     printf "%s\n" "$emailBodyMsge" >> "$cemTmpEMailContent"
 
     ## Footer ##
@@ -542,12 +539,16 @@ _SendEMailNotification_CEM_()
       ! _CheckEMailConfigFileFromAMTM_CEM_
    then return 1 ; fi
 
-   local CC_ADDRESS_STR=""  CC_ADDRESS_ARG=""
+   local CC_ADDRESS_OK=""
    local theMsgStr  logMsgStr  logPrioNum  mailpwd
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
    [ -z "$FROM_NAME" ] && FROM_NAME="$(_GetRouterUserNameID_CEM_)"
    [ -z "$FRIENDLY_ROUTER_NAME" ] && FRIENDLY_ROUTER_NAME="$(_GetRouterModelID_CEM_)"
+
+   if [ -n "$CC_NAME" ] && [ -n "$CC_ADDRESS" ]
+   then CC_ADDRESS_OK=TRUE
+   fi
 
    ! _CreateEMailContent_CEM_ "$@" && return 1
 
@@ -557,24 +558,27 @@ _SendEMailNotification_CEM_()
        _PrintMsg_CEM_ "\nPlease wait...\n"
    fi
 
-   printf '' > "$cemErrCurlLogFile"
-   printf '' > "$cemTmpCurlLogFile"
+   printf '' > "$cemErrCurlLogFPath"
+   printf '' > "$cemTmpCurlLogFPath"
 
    mailpwd="$(/usr/sbin/openssl aes-256-cbc "$emailPwEnc" -d -in "$amtmEMailPswdFileCEM" -pass pass:ditbabot,isoi)"
 
    /usr/sbin/curl -vLSs --retry 3 --retry-delay 5 --retry-connrefused \
    --connect-timeout 30 --max-time 60 \
    -w "${cemHTTPstatusStr}: %{http_code}\n" \
-   --output /dev/null --stderr "$cemErrCurlLogFile" \
+   --output /dev/null --stderr "$cemErrCurlLogFPath" \
    --url "${PROTOCOL}://${SMTP}:${PORT}" \
-   --mail-from "$FROM_ADDRESS" --mail-rcpt "$TO_ADDRESS" $CC_ADDRESS_ARG \
-   --user "${USERNAME}:$mailpwd" --upload-file "$cemTmpEMailContent" \
-   $SSL_FLAG --ssl-reqd --crlf >> "$cemTmpCurlLogFile"
+   --user "${USERNAME}:$mailpwd" \
+   --mail-from "$FROM_ADDRESS" \
+   --mail-rcpt "$TO_ADDRESS" \
+   ${CC_ADDRESS_OK:+--mail-rcpt "$CC_ADDRESS"} \
+   --upload-file "$cemTmpEMailContent" \
+   $SSL_FLAG --ssl-reqd --crlf >> "$cemTmpCurlLogFPath"
    curlRetCode="$?"
 
    statusCODE="$curlRetCode"
    statusSTRx="Curl Status Code: $curlRetCode"
-   httpStatusSTR="$(grep -oE "${cemHTTPstatusStr}: [4-5][0-9]{2,}" "$cemTmpCurlLogFile")"
+   httpStatusSTR="$(grep -oE "${cemHTTPstatusStr}: [4-5][0-9]{2,}" "$cemTmpCurlLogFPath")"
 
    if [ "$curlRetCode" -eq 0 ] && [ -z "$httpStatusSTR" ]
    then
@@ -591,11 +595,11 @@ _SendEMailNotification_CEM_()
        logMsgStr="**ERROR**: Failure to send email notification [$1] [$statusSTRx]."
        theMsgStr="${cemREDct}**ERROR**${cemCLRct}: Failure to send email notification [${cemMGNTct}${1}${cemCLRct}] [${cemREDct}${statusSTRx}${cemCLRct}].\n\n"
 
-       if [ -s "$cemErrCurlLogFile" ] && \
+       if [ -s "$cemErrCurlLogFPath" ] && \
           "$cemIsInteractive" && "$cemIsVerboseMode" && "$cemIsDebugMode"
        then
            echo "======================================================="
-           cat "$cemErrCurlLogFile"
+           cat "$cemErrCurlLogFPath"
            echo "======================================================="
        fi
    fi
@@ -611,7 +615,7 @@ _SendEMailNotification_CEM_()
    then rm -f "$cemTmpEMailContent"
    else mv -f "$cemTmpEMailContent" "${cemTmpEMailContent}.DEBUG"
    fi
-   rm -f "$cemTmpCurlLogFile" "$cemErrCurlLogFile"
+   rm -f "$cemTmpCurlLogFPath" "$cemErrCurlLogFPath"
 
    return "$statusCODE"
 }
