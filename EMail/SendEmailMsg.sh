@@ -13,12 +13,12 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Feb-19 [Martinski W.]
-# Last Modified: 2026-Sep-15 [Martinski W.]
+# Last Modified: 2026-Sep-17 [Martinski W.]
 #####################################################################
 set -u
 
 readonly SCRIPT_VERSION="0.8.0"
-readonly SCRIPT_VERSTAG="26091500"
+readonly SCRIPT_VERSTAG="26091723"
 readonly SCRIPT_TNAME="SendEmailMsg"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
@@ -58,9 +58,9 @@ SCRIPT_URL_REPO2="${SCRIPT_URL_BASE2}/${SCRIPT_GH_BRANCH}/EMail"
 readonly TMP_DIR="/tmp"
 readonly TEMP_DIR="/tmp/var/tmp"
 readonly curlHTTPstatusStr="HTTP_Status_Code"
-readonly curlTmpLogFile="${TEMP_DIR}/tmpCurl_${scriptFNameTag}_$$.TMP.LOG"
-readonly curlErrLogFile="${TEMP_DIR}/tmpCurl_${scriptFNameTag}_$$.ERR.LOG"
-readonly emailBodyFPath="${TEMP_DIR}/tmpEMailBody_${scriptFNameTag}.$$.TMP"
+readonly curlTmpLogFPath="${TEMP_DIR}/tmpSendCurl_${scriptFNameTag}_$$.TMP.LOG"
+readonly curlErrLogFPath="${TEMP_DIR}/tmpSendCurl_${scriptFNameTag}_$$.ERR.LOG"
+readonly emailBodyCFPath="${TEMP_DIR}/tmpEMailBody_${scriptFNameTag}.$$.TMP"
 
 readonly emailUpdateMutexFLock_FD=783
 readonly emailUpdateMutexFLock_FN="${TEMP_DIR}/CEMailUpdateCheck.FLOCK"
@@ -630,18 +630,18 @@ _DownloadScriptFile_()
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
    rm -f "$tempFilePathDL"
-   printf '' > "$curlErrLogFile"
-   printf '' > "$curlTmpLogFile"
+   printf '' > "$curlErrLogFPath"
+   printf '' > "$curlTmpLogFPath"
 
    curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
    --connect-timeout 30 --max-time 60 \
-   -w "${curlHTTPstatusStr}: %{http_code}\n" --stderr "$curlErrLogFile" \
-   "$srcFilePathURL" --output "$tempFilePathDL" >> "$curlTmpLogFile"
+   -w "${curlHTTPstatusStr}: %{http_code}\n" --stderr "$curlErrLogFPath" \
+   "$srcFilePathURL" --output "$tempFilePathDL" >> "$curlTmpLogFPath"
    curlRetCode="$?"
 
    statusCODE="$curlRetCode"
    statusSTRx="Curl Status Code: $curlRetCode"
-   httpStatusSTR="$(grep -oE "${curlHTTPstatusStr}: [4-5][0-9]{2,}" "$curlTmpLogFile")"
+   httpStatusSTR="$(grep -oE "${curlHTTPstatusStr}: [4-5][0-9]{2,}" "$curlTmpLogFPath")"
 
    if [ "$curlRetCode" -eq 0 ] && \
       [ -z "$httpStatusSTR" ] && [ -s "$tempFilePathDL" ]
@@ -660,8 +660,8 @@ _DownloadScriptFile_()
 
        if [ "$4" -eq "$urlDLMax" ] || "$isVerboseMode" || "$doShowErrorMsgs"
        then
-           if [ -s "$curlErrLogFile" ]
-           then echo ; cat "$curlErrLogFile"
+           if [ -s "$curlErrLogFPath" ]
+           then echo ; cat "$curlErrLogFPath"
            fi
            _PrintMsg_ "\n${theMsgStr}\n"
            [ "$4" -lt "$urlDLMax" ] && \
@@ -670,7 +670,7 @@ _DownloadScriptFile_()
        rm -f "$tempFilePathDL"
    fi
 
-   rm -f "$curlErrLogFile" "$curlTmpLogFile"
+   rm -f "$curlErrLogFPath" "$curlTmpLogFPath"
    return "$statusCODE"
 }
 
@@ -916,7 +916,7 @@ _SendEMailMsg_()
    fi
    local retCode  showErrorMsgs=false
    local emailBodyMsgStr  emailBodyFile=""  emailBodyTitleStr=""
-   local emailBodySendFPath="${emailBodyFPath}.SEND"
+   local emailBodySendFPath="${emailBodyCFPath}.SEND"
 
    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
    then
@@ -985,7 +985,7 @@ _Send_Email_TEST_()
 {
     local retCode
     local emailSubject="$1"  emailBodyTitle="$2"
-    local emailBodyTestFPath="${emailBodyFPath}.TEST"
+    local emailBodyTestFPath="${emailBodyCFPath}.TEST"
 
     {
        printf "\nThis is a TEST to check and verify if sending email notifications"
