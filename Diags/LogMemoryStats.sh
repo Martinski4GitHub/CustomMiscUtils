@@ -54,12 +54,12 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2026-Sep-10 [Martinski W.]
+# Last Modified: 2026-Sep-18 [Martinski W.]
 #########################################################################
 set -u
 
 readonly SCRIPT_VERSION="0.8.0"
-readonly SCRIPT_VERSTAG="26091023"
+readonly SCRIPT_VERSTAG="26091823"
 readonly SCRIPT_TNAME="LogMemoryStats"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
@@ -161,7 +161,7 @@ readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
 
 ## The shared custom email script to handle sending emails ##
-readonly SEND_EMAIL_SCRIPT_TNAME="SendEmailMsg"
+readonly SEND_EMAIL_SCRIPT_TNAME="SendEmail"
 readonly SEND_EMAIL_SCRIPT_FNAME="${SEND_EMAIL_SCRIPT_TNAME}.sh"
 readonly SEND_EMAIL_INSTALL_PATH="${JFFS_ADDONS_DIR}/${SEND_EMAIL_SCRIPT_TNAME}.d"
 readonly SEND_EMAIL_SCRIPT_FPATH="${SEND_EMAIL_INSTALL_PATH}/$SEND_EMAIL_SCRIPT_FNAME"
@@ -1260,7 +1260,7 @@ _SendEMailNotification_()
 {
    if [ ! -s "$SEND_EMAIL_SCRIPT_FPATH" ]
    then
-       logMsg="Email script file [$SEND_EMAIL_SCRIPT_FNAME] *NOT* found."
+       logMsg="Email script file ${REDct}${SEND_EMAIL_SCRIPT_FNAME}${CLRct} *NOT* found."
        _MsgToSysLog_ "$logMsg" WARN
        _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: ${logMsg}\n\n"
        _WaitForEnterKey_
