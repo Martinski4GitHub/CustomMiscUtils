@@ -54,16 +54,16 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2026-Sep-18 [Martinski W.]
+# Last Modified: 2026-Sep-20 [Martinski W.]
 #########################################################################
 set -u
 
 readonly SCRIPT_VERSION="0.8.0"
-readonly SCRIPT_VERSTAG="26091823"
+readonly SCRIPT_VERSTAG="26092023"
 readonly SCRIPT_TNAME="LogMemoryStats"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
-readonly SCRIPT_BRANCH="develop"   ##**TBD "master" RELEASE**##
+readonly SCRIPT_BRANCH="master"
 readonly URL_DIAGS_DIR="Diags"
 readonly URL_EMAIL_DIR="EMail"
 readonly REPO_GHB_URL2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/$SCRIPT_BRANCH"
@@ -1278,7 +1278,7 @@ _SendEMailNotification_()
 
    _PrintMsg_ "\nSending email notification [$1].\nPlease wait..."
 
-   $SEND_EMAIL_SCRIPT_FPATH -send -quiet -From="$emailSenderID" "$emailSubject" -File="$tmpEMailBodyFile" "$emailBodyTitle"
+   $SEND_EMAIL_SCRIPT_FPATH -quiet -From="$emailSenderID" "$emailSubject" -File="$tmpEMailBodyFile" "$emailBodyTitle"
    retCode="$?"
 
    if [ "$retCode" -eq 0 ]
