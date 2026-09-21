@@ -12,11 +12,11 @@
 # ARG4: Number of seconds to wait for client to wake up.
 #
 # Creation Date: 2022-Jan-16 [Martinski W.]
-# Last Modified: 2024-Apr-23 [Martinski W.]
+# Last Modified: 2026-Aug-30 [Martinski W.]
 ####################################################################
 set -u
 
-readonly SCRIPT_VERSION=0.2.7
+readonly SCRIPT_VERSION=0.2.8
 readonly scriptFilePath="$0"
 readonly scriptFileName="${0##*/}"
 readonly scriptFNameTag="${scriptFileName%%.*}"
@@ -86,10 +86,10 @@ _LogMsg_()
    if [ $# -lt 1 ] || [ -z "$1" ]
    then return 1
    fi
-   if [ $# -lt 2 ] || [ -z "$2" ] || \
-      ! echo "$2" | grep -qE "^[1-6]$"
-   then logPrioNum="$pLogNOTIC"
-   else logPrioNum="$2"
+   if [ $# -gt 1 ] && [ -n "$2" ] && \
+      echo "$2" | grep -qE "^[1-6]$"
+   then logPrioNum="$2"
+   else logPrioNum="$pLogNOTIC"
    fi
    if "$isInteractive" && \
       { [ $# -lt 3 ] || [ "$3" != "NOECHO" ] ; }
@@ -126,6 +126,35 @@ _DoExit_()
 }
 
 #--------------------------------------------------#
+# To handle LAN subnets with Network Mask < 24
+# EXAMPLE: 
+# 192.168.0.0/23 [192.168.0.1 TO 192.168.1.254]
+#--------------------------------------------------#
+_CIDR_IPaddrBlockContainsIPaddr_()
+{
+   if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+   then return 1
+   fi
+   local cidrNetIPaddr="${1%/*}"
+   local privLANIPaddr="$2"
+
+   ## If FIRST octet does NOT match, LAN IP address is NOT included ##
+   if [ "${privLANIPaddr%%.*}" -ne "${cidrNetIPaddr%%.*}" ]
+   then return 1
+   fi
+
+   awk -v aCIDR="$1" -v theIP="$2" '
+      function ip2int(ipa, oct)
+      { split(ipa,oct,".")
+        return oct[1]*16777216 + oct[2]*65536 + oct[3]*256 + oct[4] }
+      BEGIN{
+         split(aCIDR,array,"/"); netIP=array[1]; bits=array[2]+0
+         mask = bits==0 ? 0 : and(0xffffffff, lshift(0xffffffff,32-bits))
+         exit and(ip2int(theIP),mask)==and(ip2int(netIP),mask) ? 0 : 1
+      }'
+}
+
+#--------------------------------------------------#
 _Validate_MACaddr_()
 {
    if [ $# -eq 0 ] || [ -z "$1" ] || \
@@ -152,13 +181,24 @@ _Validate_IPv4addr_OnInterface_()
    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
    then return 1
    fi
+   local cidrNetIPinfo  cidrNetIPaddr  cidrIPaddrMask
 
-   netIPinfo="$(ip route show | grep -E "dev[[:blank:]]+${2}[[:blank:]]+proto kernel")"
+   cidrNetIPinfo="$(ip route show | grep -E "dev[[:blank:]]+${2}[[:blank:]]+proto kernel")"
+   [ -z "$cidrNetIPinfo" ] && return 1
 
-   [ -z "$netIPinfo" ] && return 1
-   netIPaddr="$(echo "$netIPinfo" | awk -F ' ' '{print $1}')"
+   cidrNetIPaddr="$(echo "$cidrNetIPinfo" | awk -F ' ' '{print $1}')"
+   cidrNetIPmask="$(echo "$cidrNetIPaddr" | awk -F '/' '{print $2}')"
 
-   [ "${1%.*}." = "${netIPaddr%.*}." ] && return 0 || return 1
+   if [ "$cidrNetIPmask" -gt 23 ]
+   then  #If first 3 octets match, LAN IP address is included#
+       [ "${1%.*}." = "${cidrNetIPaddr%.*}." ] && return 0 || return 1
+   fi
+
+   #Look for private LAN IP address within the network CIDR block#
+   if _CIDR_IPaddrBlockContainsIPaddr_ "$cidrNetIPaddr" "$1"
+   then return 0
+   else return 1
+   fi
 }
 
 #----------------------------------------------------------------#

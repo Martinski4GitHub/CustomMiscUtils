@@ -54,23 +54,37 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2026-Jul-24 [Martinski W.]
+# Last Modified: 2026-Sep-20 [Martinski W.]
 #########################################################################
 set -u
 
-readonly SCRIPT_VERSION="0.7.18"
-readonly SCRIPT_VERSTAG="26072423"
+readonly SCRIPT_VERSION="0.8.0"
+readonly SCRIPT_VERSTAG="26092023"
+readonly SCRIPT_TNAME="LogMemoryStats"
+readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
-readonly SCRIPT_FNAME="LogMemoryStats.sh"
 readonly SCRIPT_BRANCH="master"
-readonly SCRIPT_URL_GH="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/${SCRIPT_BRANCH}/Diags"
+readonly URL_DIAGS_DIR="Diags"
+readonly URL_EMAIL_DIR="EMail"
+readonly REPO_GHB_URL2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils/$SCRIPT_BRANCH"
+readonly REPO_GHB_URL1="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/$SCRIPT_BRANCH"
+
+readonly SCRIPT_GHB_URL2="${REPO_GHB_URL2}/$URL_DIAGS_DIR"
+readonly SCRIPT_GHB_URL1="${REPO_GHB_URL1}/$URL_DIAGS_DIR"
+readonly CEM_LIB_GH_URL2="${REPO_GHB_URL2}/$URL_EMAIL_DIR"
+readonly CEM_LIB_GH_URL1="${REPO_GHB_URL1}/$URL_EMAIL_DIR"
+
+readonly HOMEdir="/home/root"
+readonly TEMP_DIR="/tmp/var/tmp"
+readonly JFFS_ADDONS_DIR="/jffs/addons"
+readonly JFFS_SCRIPTS_DIR="/jffs/scripts"
 
 readonly branchStr_TAG="[Branch: $SCRIPT_BRANCH]"
 readonly scriptFileName="${0##*/}"
-readonly scriptFileNTag="${scriptFileName%.*}"
-readonly scriptLogFName="${scriptFileNTag}.LOG"
-readonly backupLogFName="${scriptFileNTag}.BKP.LOG"
-readonly tempLogFPath="/tmp/var/tmp/${scriptFileNTag}.TMP.LOG"
+readonly scriptFNameTag="${scriptFileName%.*}"
+readonly scriptLogFName="${scriptFNameTag}.LOG"
+readonly backupLogFName="${scriptFNameTag}.BKP.LOG"
+readonly tempLogFPath="${TEMP_DIR}/${scriptFNameTag}.TMP.LOG"
 readonly duFilterSizeKB=500   #Filter for "du" output#
 readonly CPU_Temptr_ProcDMUtemp="/proc/dmu/temperature"
 readonly CPU_Temptr_SysPowerCPU="/sys/power/bpcm/cpu_temp"
@@ -81,6 +95,7 @@ readonly REDct="\e[1;31m"
 readonly GRNct="\e[1;32m"
 readonly YLWct="\e[1;33m"
 readonly MGNTct="\e[1;35m"
+readonly CYANct="\e[1;36m"
 
 # Give priority to built-in binaries #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -119,10 +134,8 @@ fi
 # Make sure to set the log directory to a location
 # that survives a reboot so logs are not deleted.
 #-----------------------------------------------------
-readonly HOMEdir="/home/root"
-readonly TEMP_DIRPATH="/tmp/var/tmp"
 readonly defLogDirectoryPath="/opt/var/log"
-readonly altLogDirectoryPath="/jffs/scripts/logs"
+readonly altLogDirectoryPath="${JFFS_SCRIPTS_DIR}/logs"
 
 maxLogFileSizeKB="$DEF_LogFileSizeKB"
 userMaxLogFileSize="$((maxLogFileSizeKB * 1024))"
@@ -135,15 +148,23 @@ readonly scriptFilePath="${scriptDirPath}/$scriptFileName"
 readonly logMemStatsCFGdir="/jffs/configs"
 readonly logMemStatsCFGname="LogMemStatsConfig.txt"
 readonly logMemStatsCFGfile="${logMemStatsCFGdir}/$logMemStatsCFGname"
-readonly tmpEMailBodyFile="/tmp/var/tmp/tmpEMailBody_${scriptFileNTag}.$$.TXT"
+readonly tmpEMailBodyFile="${TEMP_DIR}/tmpEMailBody_${scriptFNameTag}.$$.TXT"
+
+readonly emailSenderID="${SCRIPT_TNAME}"
+readonly curlHTTPstatusStr="HTTP_Status_Code"
+readonly curlTmpLogFile="${TEMP_DIR}/tmpCurl_${scriptFNameTag}_$$.TMP.LOG"
+readonly curlErrLogFile="${TEMP_DIR}/tmpCurl_${scriptFNameTag}_$$.ERR.LOG"
 
 ## The shared custom email library to support email notifications ##
-readonly ADDONS_SHARED_LIBS_DIR_PATH="/jffs/addons/shared-libs"
+readonly ADDONS_SHARED_LIBS_DIR_PATH="${JFFS_ADDONS_DIR}/shared-libs"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FNAME="CustomEMailFunctions.lib.sh"
-readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME="DownloadCEMLibraryFile.lib.sh"
 readonly CUSTOM_EMAIL_LIB_SCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_SCRIPT_FNAME"
-readonly CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH="${ADDONS_SHARED_LIBS_DIR_PATH}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME"
-readonly CUSTOM_EMAIL_LIB_SCRIPT_URL="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/master/EMail"
+
+## The shared custom email script to handle sending emails ##
+readonly SEND_EMAIL_SCRIPT_TNAME="SendEmail"
+readonly SEND_EMAIL_SCRIPT_FNAME="${SEND_EMAIL_SCRIPT_TNAME}.sh"
+readonly SEND_EMAIL_INSTALL_PATH="${JFFS_ADDONS_DIR}/${SEND_EMAIL_SCRIPT_TNAME}.d"
+readonly SEND_EMAIL_SCRIPT_FPATH="${SEND_EMAIL_INSTALL_PATH}/$SEND_EMAIL_SCRIPT_FNAME"
 
 if [ -t 0 ] && ! tty | grep -qwi "NOT"
 then readonly isInteractive=true
@@ -155,10 +176,7 @@ backupLogFPath="${userLogDirectoryPath}/$backupLogFName"
 
 #-----------------------------------------------------------------------#
 _PrintMsg_()
-{
-   ! "$isInteractive" && return 0
-   printf "$1"
-}
+{ "$isInteractive" && printf "$1" ; }
 
 #-----------------------------------------------------------------------#
 _MsgToSysLog_()
@@ -264,47 +282,170 @@ _GetRouterModelID_()
 }
 
 #-----------------------------------------------------------#
-_DownloadCEMLibraryHelperFile_()
+_DownloadScriptFile_()
 {
-   local tempScriptFileDL="${CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH}.DL"
-
-   [ ! -d "$ADDONS_SHARED_LIBS_DIR_PATH" ] && \
-   mkdir -m 755 -p "$ADDONS_SHARED_LIBS_DIR_PATH" 2>/dev/null
-   if [ ! -d "$ADDONS_SHARED_LIBS_DIR_PATH" ]
-   then
-       _PrintMsg_ "\n**ERROR**: Directory Path [$ADDONS_SHARED_LIBS_DIR_PATH] *NOT* FOUND.\n"
-       return 1
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
+   then return 1
    fi
+   local srcFilePathURL="${1}/$2"
+   local theTempFPathDL="${TEMP_DIR}/${2}.DL.$$.TMP"
+   local theDestFName="$2"  theDestFPath="$3"  theMsgStr
+   local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
-   _PrintMsg_ "\nDownloading the library helper script file to support email notifications...\n"
+   rm -f "$theTempFPathDL"
+   printf '' > "$curlErrLogFile"
+   printf '' > "$curlTmpLogFile"
 
    curl -LSs --retry 3 --retry-delay 5 --retry-connrefused \
-        ${CUSTOM_EMAIL_LIB_SCRIPT_URL}/$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME \
-        -o "$tempScriptFileDL"
+   --connect-timeout 30 --max-time 60 \
+   -w "${curlHTTPstatusStr}: %{http_code}\n" --stderr "$curlErrLogFile" \
+   "$srcFilePathURL" --output "$theTempFPathDL" >> "$curlTmpLogFile"
+   curlRetCode="$?"
 
-   if [ ! -s "$tempScriptFileDL" ] || \
-      grep -Eiq "^404: Not Found" "$tempScriptFileDL"
+   statusCODE="$curlRetCode"
+   statusSTRx="Curl Status Code: $curlRetCode"
+   httpStatusSTR="$(grep -oE "${curlHTTPstatusStr}: [4-5][0-9]{2,}" "$curlTmpLogFile")"
+
+   if [ "$curlRetCode" -eq 0 ] && \
+      [ -z "$httpStatusSTR" ] && [ -s "$theTempFPathDL" ]
    then
-       [ -s "$tempScriptFileDL" ] && { echo ; cat "$tempScriptFileDL" ; }
-       rm -f "$tempScriptFileDL"
-       _PrintMsg_ "\n**ERROR**: Unable to download the library helper script [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME]\n"
-       return 1
+       mv -f "$theTempFPathDL" "$theDestFPath"
+       dos2unix "$theDestFPath" ; chmod 644 "$theDestFPath"
    else
-       mv -f "$tempScriptFileDL" "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
-       chmod 755 "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
-       . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
-       _PrintMsg_ "The email library helper script [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] was downloaded.\n"
-       return 0
+       if [ "$curlRetCode" -eq 0 ] && [ -n "$httpStatusSTR" ]
+       then
+           statusCODE="$(echo "$httpStatusSTR" | awk -F' ' '{print $2}')"
+           statusSTRx="HTTP Status Code: $statusCODE"
+       fi
+       if [ "$4" -eq "$urlDLMax" ] || "$isVerboseMode" || "$doShowErrorMsgs"
+       then
+           if [ -s "$curlErrLogFile" ]
+           then echo ; cat "$curlErrLogFile"
+           fi
+           theMsgStr="${REDct}**ERROR**${CLRct}: Unable to download the script file ${REDct}${theDestFName}${CLRct} [${MGNTct}${statusSTRx}${CLRct}]"
+           _PrintMsg_ "\n${theMsgStr}\n"
+           [ "$4" -lt "$urlDLMax" ] && \
+           _PrintMsg_ "\nTrying again with a different URL...\n"
+       fi
+       rm -f "$theTempFPathDL"
    fi
+
+   rm -f "$curlErrLogFile" "$curlTmpLogFile"
+   return "$statusCODE"
 }
 
 #-----------------------------------------------------------#
-_CheckScriptUpdate_()
+_DownloadCustomSendEmailScript_()
+{
+   if [ $# -eq 0 ] || [ -z "$1" ] || \
+      ! echo "$1" | grep -qE "^(-update|-install)$"
+   then
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: NO valid parameter was provided to download script file.\n"
+       return 1
+   fi
+
+   mkdir -m 755 -p "$SEND_EMAIL_INSTALL_PATH"
+   if [ ! -d "$SEND_EMAIL_INSTALL_PATH" ]
+   then
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Directory Path [$SEND_EMAIL_INSTALL_PATH] *NOT* found.\n"
+       return 1
+   fi
+
+   local actionStr1  actionStr2  retCode  urlDLCount  urlDLMax
+   local isVerboseMode=true
+
+   case "$1" in
+        -update) actionStr1="Updating" ; actionStr2="updated" ;;
+       -install) actionStr1="Installing" ; actionStr2="installed" ;;
+   esac
+
+   "$isVerboseMode" && \
+   _PrintMsg_ "\n${actionStr1} the ${GRNct}${SEND_EMAIL_SCRIPT_FNAME}${CLRct} script to send email notifications...\n"
+
+   retCode=1 ; urlDLCount=0 ; urlDLMax=2
+   for theScriptURL in "$CEM_LIB_GH_URL1" "$CEM_LIB_GH_URL2"
+   do
+       urlDLCount="$((urlDLCount + 1))"
+       if _DownloadScriptFile_ "$theScriptURL" "$SEND_EMAIL_SCRIPT_FNAME" "$SEND_EMAIL_SCRIPT_FPATH" "$urlDLCount"
+       then
+           chmod 755 "$SEND_EMAIL_SCRIPT_FPATH"
+           if "$isVerboseMode" || \
+              { [ "$urlDLCount" -gt 1 ] && "$doShowErrorMsgs" ; }
+           then
+               [ "$urlDLCount" -gt 1 ] && echo
+               _PrintMsg_ "The email script ${GRNct}${SEND_EMAIL_SCRIPT_FNAME}${CLRct} was ${actionStr2}.\n"
+           fi
+           retCode=0
+           break
+       fi
+   done
+
+   if [ "$retCode" -ne 0 ]
+   then
+       _PrintMsg_ "\nThe email script ${REDct}${SEND_EMAIL_SCRIPT_FNAME}${CLRct} was NOT ${actionStr2}.\n"
+   fi
+   return "$retCode"
+}
+
+#-----------------------------------------------------------#
+_InstallCustomSendEmailScript_()
+{
+   local isVerboseMode=true
+   local doShowErrorMsgs=true
+   local retCode=1  quietARG=""
+
+   for PARAM in "$@"
+   do
+      case $PARAM in
+          -quiet)
+              quietARG="$PARAM"
+              isVerboseMode=false
+              ;;
+          -veryquiet)
+              quietARG="$PARAM"
+              isVerboseMode=false
+              doShowErrorMsgs=false
+              ;;
+          *) ;; #IGNORED#
+      esac
+   done
+
+   if _DownloadCustomSendEmailScript_ -install "$quietARG"
+   then
+       [ ! -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] && \
+       "$SEND_EMAIL_SCRIPT_FPATH" -checkupdate
+       retCode=0
+   fi
+   return "$retCode"
+}
+
+#-----------------------------------------------------------#
+_CheckForSendEmailScript_()
+{
+   if [ ! -s "$SEND_EMAIL_SCRIPT_FPATH" ]
+   then
+       if ! _InstallCustomSendEmailScript_ -verbose
+       then return 1
+       fi
+   fi
+
+   if [ ! -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] || \
+      { [ $# -gt 0 ] && [ "$1" = "-checkupdate" ] ; }
+   then $SEND_EMAIL_SCRIPT_FPATH -checkupdate
+   fi
+
+   [ ! -x "$SEND_EMAIL_SCRIPT_FPATH" ] && \
+   chmod 755 "$SEND_EMAIL_SCRIPT_FPATH"
+}
+
+#-----------------------------------------------------------#
+_CheckScriptVersionUpdate_()
 {
    local dlVersionStr  dlVersTagStr  scriptMD5  dlTempMD5
-   local scriptVerNum  dlFileVerNum  isVerboseMode
-   local scriptFPath="${scriptDirPath}/$SCRIPT_FNAME"
-   local theTempFile="${TEMP_DIRPATH}/${SCRIPT_FNAME}.TMP"
+   local scriptVerNum  dlFileVerNum  isVerboseMode=true
+   local theScriptFPath="${scriptDirPath}/$SCRIPT_FNAME"
+   local theTmpFilePath="${TEMP_DIR}/${SCRIPT_FNAME}.$$.TMP.SH"
+   local retCode  urlDLCount  urlDLMax  doShowErrorMsgs=true
 
    _VersionStrToNum_()
    {
@@ -317,56 +458,67 @@ _CheckScriptUpdate_()
       echo "$verNum" ; return 0
    }
 
-   if [ $# -gt 0 ] && echo "$1" | grep -qE "^(-quiet|-veryquiet)$"
-   then isVerboseMode=false ; else isVerboseMode=true
+   _FormatVersionStr_()
+   {
+       if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+       then echo ; return 1
+       fi
+       echo "${GRNct}${1}${CLRct} [${GRNct}${2}${CLRct}]"
+   }
+
+   if [ $# -gt 0 ] && echo "$1" | grep -qE "^-(quiet|veryquiet)$"
+   then isVerboseMode=false ; doShowErrorMsgs=false
    fi
 
    "$isVerboseMode" && \
-   _PrintMsg_ "\nChecking for script updates...\n"
+   _PrintMsg_ "\nChecking for ${GRNct}${SCRIPT_FNAME}${CLRct} script updates...\n"
 
-   curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
-   "${SCRIPT_URL_GH}/$SCRIPT_FNAME" -o "$theTempFile"
+   retCode=1 ; urlDLCount=0 ; urlDLMax=2
+   for theScriptURL in "$SCRIPT_GHB_URL1" "$SCRIPT_GHB_URL2"
+   do
+       urlDLCount="$((urlDLCount + 1))"
+       if _DownloadScriptFile_ "$theScriptURL" "$SCRIPT_FNAME" "$theTmpFilePath" "$urlDLCount"
+       then
+           retCode=0 ; break
+       fi
+   done
 
-   if [ ! -s "$theTempFile" ] || \
-      grep -Eiq "^404: Not Found" "$theTempFile"
+   if [ "$retCode" -ne 0 ] || [ ! -s "$theTmpFilePath" ]
    then
-       [ -s "$theTempFile" ] && cat "$theTempFile"
-       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Could NOT download the latest script file.\n"
-       rm -f "$theTempFile"
+       _PrintMsg_ "\nThe script ${REDct}${SCRIPT_FNAME}${CLRct} was NOT updated.\n"
        return 1
    fi
 
-   chmod 666 "$theTempFile"
-   dlVersionStr="$(grep -E '^readonly SCRIPT_VERSION=' "$theTempFile")"
-   dlVersTagStr="$(grep -E '^readonly SCRIPT_VERSTAG=' "$theTempFile")"
+   dlVersionStr="$(grep -E '^readonly SCRIPT_VERSION=' "$theTmpFilePath" | tr -d '"')"
+   dlVersTagStr="$(grep -E '^readonly SCRIPT_VERSTAG=' "$theTmpFilePath" | tr -d '"')"
    if [ -z "$dlVersionStr" ] || [ -z "$dlVersTagStr" ]
    then
        _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Could NOT find the VERSION string.\n"
-       rm -f "$theTempFile"
+       rm -f "$theTmpFilePath"
        return 1
    fi
 
-   dlTempMD5="$(md5sum "$theTempFile" 2>/dev/null | awk -F' ' '{print $1}')"
-   scriptMD5="$(md5sum "$scriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
-   dlVersionStr="$(echo "$dlVersionStr" | tr -d '"' | cut -d'=' -f2)"
-   dlVersTagStr="$(echo "$dlVersTagStr" | tr -d '"' | cut -d'=' -f2)"
+   dlTempMD5="$(md5sum "$theTmpFilePath" 2>/dev/null | awk -F' ' '{print $1}')"
+   scriptMD5="$(md5sum "$theScriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
+   dlVersionStr="$(echo "$dlVersionStr" | sed -e 's/.*SCRIPT_VERSION=//;s/ .*$//')"
+   dlVersTagStr="$(echo "$dlVersTagStr" | sed -e 's/.*SCRIPT_VERSTAG=//;s/ .*$//')"
    dlFileVerNum="$(_VersionStrToNum_ "$dlVersionStr")"
    scriptVerNum="$(_VersionStrToNum_ "$SCRIPT_VERSION")"
 
-   if [ "$scriptMD5" = "$dlTempMD5" ] && \
-      [ "$dlVersionStr" = "$SCRIPT_VERSION" ] && \
-      [ "$dlVersTagStr" = "$SCRIPT_VERSTAG" ] && \
-      [ "$dlFileVerNum" -le "$scriptVerNum" ]
+   if [ "$scriptMD5" = "$dlTempMD5" ] || \
+      [ "$dlFileVerNum" -lt "$scriptVerNum" ]
    then
-       _PrintMsg_ "\nYou have the latest script version [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${CLRct}] available.\n\n"
-       rm -f "$theTempFile"
+       rm -f "$theTmpFilePath"
+       theVerStr="$(_FormatVersionStr_ "$SCRIPT_VERSION" "$SCRIPT_VERSTAG")"
+       _PrintMsg_ "You have the latest script version $theVerStr installed.\n"
        return 0
    fi
 
-   _PrintMsg_ "\nLatest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${CLRct}] available.\n"
-   mv -f "$theTempFile" "$scriptFPath"
-   chmod 755 "$scriptFPath"
-   _PrintMsg_ "Script has been updated to the latest version [${GRNct}${dlVersionStr}_${dlVersTagStr}${CLRct}].\n\n"
+   theVerStr="$(_FormatVersionStr_ "$dlVersionStr" "$dlVersTagStr")"
+   _PrintMsg_ "Latest script version update $theVerStr is available.\n"
+   mv -f "$theTmpFilePath" "$theScriptFPath"
+   chmod 755 "$theScriptFPath"
+   _PrintMsg_ "The script ${GRNct}${SCRIPT_FNAME}${CLRct} was updated to the latest version ${theVerStr}.\n"
    return 0
 }
 
@@ -375,7 +527,7 @@ _ValidateLogDirPath_()
 {
    if [ $# -eq 0 ] || [ -z "$1" ]
    then
-       _PrintMsg_ "\n**ERROR**: Log Directory path was *NOT* provided.\n"
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Log Directory path was *NOT* provided.\n"
        _PrintMsg_ "\nExiting now.\n\n"
        exit 1
    fi
@@ -387,7 +539,7 @@ _ValidateLogDirPath_()
        backupLogFPath="${1}/$backupLogFName"
        return 0
    fi
-   _PrintMsg_ "\n**ERROR**: Log Directory [$1] *NOT* FOUND.\n"
+   _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Log Directory [$1] *NOT* found.\n"
    _WaitForEnterKey_
 
    if [ $# -gt 1 ] && [ -n "$2" ]
@@ -1061,7 +1213,7 @@ _CreateEMailContent_()
              printf "\n%s\n" "$3"
            } > "$tmpEMailBodyFile"
            ;;
-       *) _PrintMsg_ "\n**ERROR**: UNKNOWN email parameter ID [$1]\n"
+       *) _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: UNKNOWN email parameter ID [$1]\n"
            return 1
            ;;
    esac
@@ -1106,19 +1258,18 @@ _CreateEMailContent_()
 #-----------------------------------------------------------------------#
 _SendEMailNotification_()
 {
-   if [ -z "${amtmIsEMailConfigFileEnabled:+xSETx}" ]
+   if [ ! -s "$SEND_EMAIL_SCRIPT_FPATH" ]
    then
-       logTag="**WARNING**_${scriptFileName}_[$$]"
-       logMsg="Email library script [$CUSTOM_EMAIL_LIB_SCRIPT_FNAME] *NOT* FOUND."
+       logMsg="Email script file ${REDct}${SEND_EMAIL_SCRIPT_FNAME}${CLRct} *NOT* found."
        _MsgToSysLog_ "$logMsg" WARN
-       _PrintMsg_ "\n%s: %s\n\n" "$logTag" "$logMsg"
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: ${logMsg}\n\n"
        _WaitForEnterKey_
        return 1
    fi
 
    if [ $# -eq 0 ] || [ -z "$1" ] || [ -z "$2" ]
    then
-       _PrintMsg_ "\n**ERROR**: INSUFFICIENT email parameters\n"
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: INSUFFICIENT email parameters\n"
        return 1
    fi
    local retCode  emailSubject=""  emailBodyTitle=""
@@ -1126,23 +1277,23 @@ _SendEMailNotification_()
    ! _CreateEMailContent_ "$@" && return 1
 
    _PrintMsg_ "\nSending email notification [$1].\nPlease wait..."
-   cemIsVerboseMode=false
 
-   _SendEMailNotification_CEM_ "$emailSubject" "-F=$tmpEMailBodyFile" "$emailBodyTitle"
+   $SEND_EMAIL_SCRIPT_FPATH -quiet -From="$emailSenderID" "$emailSubject" -File="$tmpEMailBodyFile" "$emailBodyTitle"
    retCode="$?"
 
    if [ "$retCode" -eq 0 ]
    then
-       logTag="INFO:"
-       logMsg="The email notification was sent successfully [$1]."
+       logTag=""
+       logMsg="The email notification [$1] was sent successfully."
    else
-       logTag="**ERROR**:"
-       logMsg="Failure to send email notification [Error Code: $retCode] [$1]."
+       logTag="${REDct}**ERROR**${CLRct}: "
+       logMsg="Failure to send email notification [$1] [Error Code: $retCode]."
    fi
-   _PrintMsg_ "\n${logTag} ${logMsg}\n"
-   [ "$retCode" -ne 0 ] && _WaitForEnterKey_
 
-   [ -f "$tmpEMailBodyFile" ] && rm -f "$tmpEMailBodyFile"
+   _PrintMsg_ "\n${logTag}${logMsg}\n"
+   _WaitForEnterKey_
+
+   rm -f "$tmpEMailBodyFile"
    return "$retCode"
 }
 
@@ -1294,7 +1445,7 @@ _JFFS_ShowUsageNotification_()
        JFFS_NOT_MOUNTED)
            alertMsg="JFFS partition is *NOT* found mounted."
            {
-              printf "\n**ALERT**\n${alertMsg}\n"
+              printf "\n${REDct}**ALERT**${CLRct}\n${alertMsg}\n"
            } >> "$tempLogFPath"
            _MsgToSysLog_ "$alertMsg" ALERT
            return 0
@@ -1302,7 +1453,7 @@ _JFFS_ShowUsageNotification_()
        JFFS_READ_ONLY)
            alertMsg="JFFS partition is mounted READ-ONLY."
            {
-              printf "\n**ALERT**\n${alertMsg}\n"
+              printf "\n${REDct}**ALERT**${CLRct}\n${alertMsg}\n"
            } >> "$tempLogFPath"
            _MsgToSysLog_ "$alertMsg" ALERT
            return 0
@@ -1339,12 +1490,12 @@ _JFFS_ShowUsageNotification_()
 
    alertMsg="JFFS usage of ${2}% exceeds ${usageThreshold}%."
    {
-      printf "\n${logMsg}\n"
+      printf "\n${REDct}${logMsg}${CLRct}\n"
       "$forTestOnly" && \
       printf "---------------------------------------------------\n"
-      printf "%s\n" "$alertMsg"
+      printf "${MGNTct}%s${CLRct}\n" "$alertMsg"
       printf "%s\n" "$(df -hT | head -n1)"
-      printf "%s\n" "$3"
+      printf "${YLWct}%s${CLRct}\n\n" "$3"
    } >> "$tempLogFPath"
 
    _MsgToSysLog_ "$alertMsg" ALERT
@@ -1496,11 +1647,11 @@ _NVRAM_ShowUsageNotification_()
 
    alertMsg="NVRAM usage of ${2}% exceeds ${usageThreshold}%."
    {
-      printf "\n${logMsg}\n"
+      printf "\n${REDct}${logMsg}${CLRct}\n"
       "$forTestOnly" && \
       printf "---------------------------------------------------\n"
-      printf "%s" "$alertMsg"
-      printf "\n%s\n" "$3"
+      printf "${MGNTct}%s${CLRct}\n" "$alertMsg"
+      printf "${YLWct}%s${CLRct}\n\n" "$3"
    } >> "$tempLogFPath"
 
    _MsgToSysLog_ "$alertMsg" ALERT
@@ -1645,12 +1796,12 @@ _TMPFS_ShowUsageNotification_()
 
    alertMsg="TMPFS usage of ${2}% exceeds ${usageThreshold}%."
    {
-      printf "\n${logMsg}\n"
+      printf "\n${REDct}${logMsg}${CLRct}\n"
       "$forTestOnly" && \
       printf "---------------------------------------------------\n"
-      printf "%s\n" "$alertMsg"
+      printf "${MGNTct}%s${CLRct}\n" "$alertMsg"
       printf "%s\n" "$(df -hT | head -n1)"
-      printf "%s\n" "$3"
+      printf "${YLWct}%s${CLRct}\n\n" "$3"
    } >> "$tempLogFPath"
 
    _MsgToSysLog_ "$alertMsg" ALERT
@@ -1772,10 +1923,10 @@ _CPU_ShowTemperatureNotification_()
 
    alertMsg="CPU temperature of ${2}°C exceeds ${cpuThermalThreshold}°C."
    {
-      printf "\n${logMsg}\n"
+      printf "\n${REDct}${logMsg}${CLRct}\n"
       "$forTestOnly" && \
       printf "---------------------------------------------------\n"
-      printf "%s\n" "$alertMsg"
+      printf "${MGNTct}${alertMsg}${CLRct}\n\n"
    } >> "$tempLogFPath"
 
    _MsgToSysLog_ "$alertMsg" ALERT
@@ -2103,43 +2254,38 @@ _CheckForCronJobSetup_()
     return 1
 }
 
-quietArg=""
-updateArg=""
+quietARG=""
+updateARG=""
 
 for PARAM in "$@"
 do
    case "$PARAM" in
        "-verbose" | "-quiet" | "-veryquiet")
-          quietArg="$PARAM"
+          quietARG="$PARAM"
           ;;
        -checkupdate)
-          updateArg="$PARAM"
+          updateARG="$PARAM"
           ;;
        *) ;; #CONTINUE#
    esac
 done
 
-if [ "$updateArg" = "-checkupdate" ]
+_CheckConfigurationFile_
+_ValidateLogDirPath_ "$userLogDirectoryPath" "$prefLogDirectoryPath" "$altLogDirectoryPath"
+_CheckLogFileSize_
+
+if [ "$updateARG" = "-checkupdate" ]
 then
-    _CheckScriptUpdate_ "$quietArg"
-    exit $?
+    _CheckScriptVersionUpdate_ "$quietARG"
+    if "$isSendEmailNotificationsEnabled"
+    then _CheckForSendEmailScript_ "$updateARG"
+    fi
+    exit 0
 fi
 
 numVal=0
 numProcs=15
 duUnits="HR"
-downloadHelper=false
-readonly routerMODEL_ID="$(_GetRouterModelID_)"
-readonly routerFWversion="$(_GetCurrentFWVersion_)"
-
-if [ "$SCRIPT_BRANCH" = "master" ]
-then scriptVersInfo="$SCRIPT_VERSION"
-else scriptVersInfo="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
-fi
-
-_CheckConfigurationFile_
-_ValidateLogDirPath_ "$userLogDirectoryPath" "$prefLogDirectoryPath" "$altLogDirectoryPath"
-_CheckLogFileSize_
 
 if [ $# -gt 0 ] && [ -n "$1" ]
 then
@@ -2170,10 +2316,6 @@ then
            _SetConfigurationOption_ isSendEmailNotificationsEnabled false
            exit 0
            ;;
-        -download)
-           if [ $# -gt 1 ] && [ "$2" = "-cemdlhelper" ]
-           then downloadHelper=true ; fi
-           ;;
         -maxlogsize)
            shift ; _SetMaxLogFileSize_ "$@"
            exit 0
@@ -2199,20 +2341,12 @@ then
     esac
 fi
 
-if "$isSendEmailNotificationsEnabled"
-then
-   if "$downloadHelper" || [ ! -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
-   then _DownloadCEMLibraryHelperFile_ ; fi
+readonly routerMODEL_ID="$(_GetRouterModelID_)"
+readonly routerFWversion="$(_GetCurrentFWVersion_)"
 
-   if [ -s "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH" ]
-   then
-       . "$CUSTOM_EMAIL_LIB_DLSCRIPT_FPATH"
-       _CheckForLibraryScript_CEM_ "$updateArg" "$quietArg"
-   else
-       _PrintMsg_ "\n**ERROR**: Helper script file [$CUSTOM_EMAIL_LIB_DLSCRIPT_FNAME] *NOT* FOUND.\n"
-
-       [ -s "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" ] && . "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
-   fi
+if [ "$SCRIPT_BRANCH" = "master" ]
+then readonly scriptVersInfo="$SCRIPT_VERSION"
+else readonly scriptVersInfo="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
 fi
 
 {
@@ -2254,6 +2388,10 @@ fi
    echo
    top -b -n1 | head -n "$((numProcs + 4))"
 } > "$tempLogFPath"
+
+if "$isSendEmailNotificationsEnabled"
+then _CheckForSendEmailScript_
+fi
 
 _CheckUsageThresholds_JFFS_
 _CheckUsageThresholds_NVRAM_
