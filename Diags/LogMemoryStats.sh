@@ -54,12 +54,12 @@
 # large files are being created in "TMPFS" or "JFFS" filesystem.
 #------------------------------------------------------------------------
 # Creation Date: 2021-Apr-03 [Martinski W.]
-# Last Modified: 2026-Sep-20 [Martinski W.]
+# Last Modified: 2026-Sep-22 [Martinski W.]
 #########################################################################
 set -u
 
 readonly SCRIPT_VERSION="0.8.0"
-readonly SCRIPT_VERSTAG="26092023"
+readonly SCRIPT_VERSTAG="26092223"
 readonly SCRIPT_TNAME="LogMemoryStats"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 
@@ -1278,7 +1278,7 @@ _SendEMailNotification_()
 
    _PrintMsg_ "\nSending email notification [$1].\nPlease wait..."
 
-   $SEND_EMAIL_SCRIPT_FPATH -quiet -From="$emailSenderID" "$emailSubject" -File="$tmpEMailBodyFile" "$emailBodyTitle"
+   $SEND_EMAIL_SCRIPT_FPATH -quiet -From="$emailSenderID" "$emailSubject" -Body="$tmpEMailBodyFile" -Title="$emailBodyTitle"
    retCode="$?"
 
    if [ "$retCode" -eq 0 ]
