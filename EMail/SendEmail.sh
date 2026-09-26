@@ -21,7 +21,7 @@ readonly SCRIPT_VERSION="v0.9.1"
 readonly SCRIPT_VERSTAG="26092522"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
-SCRIPT_BRANCH="master"
+SCRIPT_BRANCH="develop"
 
 # Give FIRST priority to built-in binaries over any other #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
