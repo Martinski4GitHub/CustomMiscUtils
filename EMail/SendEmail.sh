@@ -18,7 +18,7 @@
 set -u
 
 readonly SCRIPT_VERSION="v0.9.1"
-readonly SCRIPT_VERSTAG="26092520"
+readonly SCRIPT_VERSTAG="26092522"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 SCRIPT_BRANCH="develop"   ##**SET to "master" for RELEASE**##
@@ -1177,7 +1177,7 @@ _CenterTextStr_()
 _ShowMenuHeader_()
 {
    local spaceLen=50  colorCT
-   [ "$SCRIPT_BRANCH" = 'master' ] && colorCT="$GRNct" || colorCT="$MGNTct"
+   [ "$SCRIPT_BRANCH" = 'master' ] && colorCT="$CYANct" || colorCT="$MGNTct"
    clear ; echo
    printf "${BOLDct}##====================================================##${CLRct}\n"
    printf "${BOLDct}##                   ${GRNct}SendEmail Tool${CLRct}                   ${BOLDct}##${CLRct}\n"
