@@ -13,14 +13,15 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Jun-14 [Martinski W.]
-# Last Modified: 2026-Sep-22 [Martinski W.]
+# Last Modified: 2026-Sep-25 [Martinski W.]
 #####################################################################
 set -u
 
-readonly SCRIPT_VERSION="0.9.0"
-readonly SCRIPT_VERSTAG="26092223"
+readonly SCRIPT_VERSION="v0.9.1"
+readonly SCRIPT_VERSTAG="26092520"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
+SCRIPT_BRANCH="develop"   ##**SET to "master" for RELEASE**##
 
 # Give FIRST priority to built-in binaries over any other #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -48,12 +49,19 @@ readonly SCRIPT_CONFIG_FPATH="${SCRIPT_INSTALL_PATH}/${SCRIPT_TNAME}.conf"
 readonly theScriptFPath="${SCRIPT_INSTALL_PATH}/$SCRIPT_FNAME"
 readonly theScriptSLink="${JFFS_SCRIPTS_DIR}/$SCRIPT_TNAME"
 
-readonly SCRIPT_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
-readonly SCRIPT_URL_BASE1="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils"
+readonly REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW"
+readonly REPO_URL_BASE1="https://raw.githubusercontent.com/Martinski4GitHub"
 
-SCRIPT_GH_BRANCH="master"
-SCRIPT_URL_REPO1="${SCRIPT_URL_BASE1}/${SCRIPT_GH_BRANCH}/EMail"
-SCRIPT_URL_REPO2="${SCRIPT_URL_BASE2}/${SCRIPT_GH_BRANCH}/EMail"
+readonly EMAIL_LIB_BRANCH="master"
+readonly EMAIL_LIB_URL_BASE1="${REPO_URL_BASE1}/CustomMiscUtils"
+readonly EMAIL_LIB_URL_BASE2="${REPO_URL_BASE2}/CustomMiscUtils"
+readonly EMAIL_LIB_REPO_URL1="${EMAIL_LIB_URL_BASE1}/${EMAIL_LIB_BRANCH}/EMail"
+readonly EMAIL_LIB_REPO_URL2="${EMAIL_LIB_URL_BASE2}/${EMAIL_LIB_BRANCH}/EMail"
+
+readonly SCRIPT_URL_BASE1="${REPO_URL_BASE1}/SendEmail"
+readonly SCRIPT_URL_BASE2="${REPO_URL_BASE2}/SendEmail"
+SCRIPT_URL_REPO1="${SCRIPT_URL_BASE1}/$SCRIPT_BRANCH"
+SCRIPT_URL_REPO2="${SCRIPT_URL_BASE2}/$SCRIPT_BRANCH"
 
 readonly TMP_DIR="/tmp"
 readonly TEMP_DIR="/tmp/var/tmp"
@@ -67,11 +75,14 @@ readonly emailUpdateMutexFLock_FN="${TEMP_DIR}/CEMailUpdateCheck.FLOCK"
 emailUpdateMutexFLock_OK=false  #To check if/when we own the Lock#
 
 readonly CLRct="\e[0m"
+readonly BOLDct="\e[1m"
 readonly REDct="\e[1;31m"
 readonly GRNct="\e[1;32m"
 readonly YLWct="\e[1;33m"
 readonly MGNTct="\e[1;35m"
 readonly CYANct="\e[1;36m"
+readonly GRAYEDct="\e[0;30;47m"
+readonly BOLDUNDERLN="\e[1;4m"
 
 readonly pLogALERT=1
 readonly pLogCRITC=2
@@ -86,11 +97,15 @@ then readonly isInteractive=true
 else readonly isInteractive=false
 fi
 
-if [ "$SCRIPT_GH_BRANCH" = "master" ]
+if [ "$SCRIPT_BRANCH" = 'master' ]
 then
+    readonly branchxStrTAG="[ Branch: stable ]"
+    readonly versionStrTAG="${SCRIPT_VERSION}"
     readonly versionStrNums="${SCRIPT_VERSION} ${CLRct}[${GRNct}${SCRIPT_VERSTAG}${CLRct}]"
     readonly versionStrInfo="${GRNct}${SCRIPT_VERSION}${CLRct} [${GRNct}${SCRIPT_VERSTAG}${CLRct} - Branch: ${GRNct}stable${CLRct}]"
 else
+    readonly branchxStrTAG="[ Branch: development ]"
+    readonly versionStrTAG="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
     readonly versionStrNums="${SCRIPT_VERSION} ${CLRct}[${GRNct}${SCRIPT_VERSTAG}${CLRct} - Branch: ${MGNTct}develop${CLRct}]"
     readonly versionStrInfo="${GRNct}${SCRIPT_VERSION}${CLRct} [${GRNct}${SCRIPT_VERSTAG}${CLRct} - Branch: ${MGNTct}develop${CLRct}]"
 fi
@@ -122,47 +137,47 @@ and the AMTM email configuration file as the user-defined email setup.
 
 To get this usage and syntax description:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-help${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-help${CLRct}
 
 
 To display version information:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-version${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-version${CLRct}
 
 
 To install the script and its configuration file:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-install${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-install${CLRct}
 
 
 To uninstall the script and its configuration file:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-uninstall${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-uninstall${CLRct}
 
 
 To check for and install the latest script version update:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-checkupdate${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-checkupdate${CLRct}
 
 
 To force installation of the latest script version update:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-forceupdate${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-forceupdate${CLRct}
 
 
 To switch to the production/stable version of the script:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-stable${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-stable${CLRct}
 
 
 To switch to the development branch version of the script:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-develop${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-develop${CLRct}
 
 
 To view the current script configuration file:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-showconf${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-showconf${CLRct}
 
 EOF1
 
@@ -170,29 +185,29 @@ EOF1
 
 To test and verify if the current email notification setup is working:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct}
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "SUBJECT_LINE"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "SUBJECT_LINE"
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "SUBJECT_LINE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "SUBJECT_LINE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE"
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
 
-   ${YLWct}--------------${CLRct}
-   Example calls:
-   ${YLWct}--------------${CLRct}
+  ${YLWct}--------------${CLRct}
+  Example calls:
+  ${YLWct}--------------${CLRct}
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct}
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "TEST Email Subject"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "TEST Email Subject"
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "TEST Email Subject" ${MGNTct}-Title=${CLRct}"TESTING My Email Setup"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "TEST Email Subject" ${MGNTct}-Title=${CLRct}"TESTING My Email Setup"
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} ${MGNTct}-From=${CLRct}"SenderID" "TEST Email Subject"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} ${MGNTct}-From=${CLRct}"SenderID" "TEST Email Subject"
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} ${MGNTct}-From=${CLRct}"SenderID" "TEST Email Subject" ${MGNTct}-Title=${CLRct}"TESTING My Email Setup"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} ${MGNTct}-From=${CLRct}"SenderID" "TEST Email Subject" ${MGNTct}-Title=${CLRct}"TESTING My Email Setup"
 
 EOF2
 
@@ -200,49 +215,49 @@ EOF2
 
 To send email notifications [the order of the arguments is important]:
 
-   ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" "EMAIL_BODY_STRING"
+  ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" "EMAIL_BODY_STRING"
 
-   ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" "EMAIL_BODY_STRING" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
+  ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" "EMAIL_BODY_STRING" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
 
-   ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE"
+  ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE"
 
-   ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
+  ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
 
-   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" "EMAIL_BODY_STRING"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" "EMAIL_BODY_STRING"
 
-   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" "EMAIL_BODY_STRING" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" "EMAIL_BODY_STRING" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
 
-   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE"
 
-   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"FROM_NAME" "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
 
 
-   ${YLWct}----------------------------------------------------------------${CLRct}
-   Example calls using a simple one-line email body message string:
-   ${YLWct}----------------------------------------------------------------${CLRct}
+  ${YLWct}----------------------------------------------------------------${CLRct}
+  Example calls using a simple one-line email body message string:
+  ${YLWct}----------------------------------------------------------------${CLRct}
    
-   ${GRNct}$SCRIPT_TNAME${CLRct} "Subject Line" "Simple Email Body Message String"
+  ${GRNct}$SCRIPT_TNAME${CLRct} "Subject Line" "Simple Email Body Message String"
 
-   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Simple Email Body Message String"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Simple Email Body Message String"
 
-   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Simple Email Body Message String" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Simple Email Body Message String" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
 
 
-   ${YLWct}-------------------------------------------------------------------${CLRct}
-   Example calls using an email body message file with multiple lines:
-   ${YLWct}-------------------------------------------------------------------${CLRct}
+  ${YLWct}-------------------------------------------------------------------${CLRct}
+  Example calls using an email body message file with multiple lines:
+  ${YLWct}-------------------------------------------------------------------${CLRct}
 
-   {
+  {
      echo "This email was sent for testing purposes only."
      echo "The email body may have multiple lines of text."
      echo "This is the third line of text of the email body."
-   } > ${TMP_DIR}/theEmailBody.txt
+  } > ${TMP_DIR}/theEmailBody.txt
 
-   ${GRNct}$SCRIPT_TNAME${CLRct} "Subject Line" ${MGNTct}-Body=${CLRct}"${TMP_DIR}/theEmailBody.txt" 
+  ${GRNct}$SCRIPT_TNAME${CLRct} "Subject Line" ${MGNTct}-Body=${CLRct}"${TMP_DIR}/theEmailBody.txt" 
 
-   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" ${MGNTct}-Body=${CLRct}"${TMP_DIR}/theEmailBody.txt"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" ${MGNTct}-Body=${CLRct}"${TMP_DIR}/theEmailBody.txt"
 
-   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" ${MGNTct}-Body=${CLRct}"${TMP_DIR}/theEmailBody.txt" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" ${MGNTct}-Body=${CLRct}"${TMP_DIR}/theEmailBody.txt" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
 
 EOF3
 
@@ -250,20 +265,20 @@ EOF3
 
 OPTIONAL command-line argument switches:
 
-   ${CYANct}-html${CLRct}     Send email in HTML format
-   ${CYANct}-ptext${CLRct}    Send email in 'Plain Text' format
-   ${CYANct}-quiet${CLRct}    Disable "Verbose Mode" (show errors only)
-   ${CYANct}-verbose${CLRct}  Enabled 'Verbose Mode'
+  ${CYANct}-html${CLRct}     Send email in HTML format
+  ${CYANct}-ptext${CLRct}    Send email in 'Plain Text' format
+  ${CYANct}-quiet${CLRct}    Disable "Verbose Mode" (show errors only)
+  ${CYANct}-verbose${CLRct}  Enabled 'Verbose Mode'
 
-   ${YLWct}--------------${CLRct}
-   Example calls:
-   ${YLWct}--------------${CLRct}
+  ${YLWct}--------------${CLRct}
+  Example calls:
+  ${YLWct}--------------${CLRct}
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test -ptext${CLRct}
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-test -ptext${CLRct}
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-ptext${CLRct} "Subject Line" "Email Body Message String"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-ptext${CLRct} "Subject Line" "Email Body Message String"
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-ptext -quiet${CLRct} ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Email Body Message String" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-ptext -quiet${CLRct} ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Email Body Message String" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
 
 
 DEFAULT global values if not explicitly modified:
@@ -308,31 +323,31 @@ Example calls:
 
 To get full help and description of all command line arguments:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-help${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-help${CLRct}
 
 Miscellaneous command line arguments:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-version${CLRct}
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-install${CLRct}
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-uninstall${CLRct}
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-checkupdate${CLRct}
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-forceupdate${CLRct}
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-stable${CLRct}
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-develop${CLRct}
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-showconf${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-version${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-install${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-uninstall${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-checkupdate${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-forceupdate${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-stable${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-develop${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-showconf${CLRct}
 
 To test and verify if the email notification setup is working:
 
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct}
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "SUBJECT_LINE"
-   ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "SUBJECT_LINE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct}
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "SubjectLine"
+ ${GRNct}$SCRIPT_TNAME ${CYANct}-test${CLRct} "SubjectLine" ${MGNTct}-Title=${CLRct}"EmailBodyTITLE"
 
 To send simple email notifications:
 
-   ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" "EMAIL_BODY_STRING"
-   ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" "EMAIL_BODY_STRING" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
-   ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE"
-   ${GRNct}$SCRIPT_TNAME${CLRct} "SUBJECT_LINE" ${MGNTct}-Body=${CLRct}"EMAIL_BODY_FILE" ${MGNTct}-Title=${CLRct}"EMAIL_BODY_TITLE"
+ ${GRNct}$SCRIPT_TNAME${CLRct} "SubjectLine" "EmailBodySTRING"
+ ${GRNct}$SCRIPT_TNAME${CLRct} "SubjectLine" "EmailBodySTRING" ${MGNTct}-Title=${CLRct}"EmailBodyTITLE"
+ ${GRNct}$SCRIPT_TNAME${CLRct} "SubjectLine" ${MGNTct}-Body=${CLRct}"EmailBodyFILE"
+ ${GRNct}$SCRIPT_TNAME${CLRct} "SubjectLine" ${MGNTct}-Body=${CLRct}"EmailBodyFILE" ${MGNTct}-Title=${CLRct}"EmailBodyTITLE"
 -----------------------------------------------------------------------
 EOF1
 }
@@ -341,13 +356,28 @@ EOF1
 _PressAnyKey_()
 {
 	! "$isInteractive" && return 0
-	local promptStr
-	if [ $# -gt 0 ] && [ -n "$1" ]
-	then promptStr="$1"
-	else promptStr="Press ANY key to continue..."
-	fi
-	printf "\n$promptStr"
+	printf "\nPress ANY key to continue..."
 	read -n1 -rs anyKEY ; echo
+}
+
+#-----------------------------------------------------------#
+_ConfirmYESorNO_()
+{
+	if ! "$isInteractive"
+	then return 0
+	fi
+	local promptStr  theAnswer
+
+	if [ $# -eq 0 ] || [ -z "$1" ]
+	then promptStr=" [yY|nN]?"
+	else promptStr=" $1 [yY|nN]?"
+	fi
+	printf "$promptStr  " ; read -r theAnswer
+	[ -z "$theAnswer" ] && theAnswer="NO"
+	if echo "$theAnswer" | grep -qE "^([Yy](es)?|YES)$"
+	then echo "OK" ; return 0
+	else echo "NO" ; return 1
+	fi
 }
 
 #-----------------------------------------------------------#
@@ -444,20 +474,104 @@ _DOStoUNIX_()
    then dos2unix "$1" ; fi
 }
 
+_EscapeChars_()
+{ printf "%s" "$1" | sed 's/[][\/{}()$|.*^&+-]/\\&/g' ; }
+
+#-----------------------------------------------------------#
+_GetScriptConfigOption_()
+{
+	if [ $# -eq 0 ] || [ -z "$1" ]
+	then echo ; return 1
+	fi
+	local keyPair  defValue=""
+
+	if [ $# -gt 1 ] && [ -n "$2" ]
+	then defValue="$2"
+	fi
+	if [ ! -d "$SCRIPT_INSTALL_PATH" ]
+	then
+		echo "$defValue"
+		return 1
+	fi
+	if [ ! -f "$SCRIPT_CONFIG_FPATH" ]
+	then printf '' > "$SCRIPT_CONFIG_FPATH"
+	fi
+	chmod 644 "$SCRIPT_CONFIG_FPATH"
+
+	keyPair="$(grep -m1 -E "^${1}=.*" "$SCRIPT_CONFIG_FPATH")"
+	if [ -z "$keyPair" ]
+	then
+		if [ -z "$defValue" ]
+		then echo "${1}=''" >> "$SCRIPT_CONFIG_FPATH"
+		else echo "${1}=$defValue" >> "$SCRIPT_CONFIG_FPATH"
+		fi
+		echo "$defValue"
+	else
+		echo "$keyPair" | cut -d'=' -f2- | sed "s/['\"]//g"
+	fi
+	return 0
+}
+
+#-----------------------------------------------------------#
+_SetScriptConfigOption_()
+{
+	if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+	then return 1
+	fi
+	local newVal
+
+	if [ ! -d "$SCRIPT_INSTALL_PATH" ]
+	then
+		mkdir -p "$SCRIPT_INSTALL_PATH"
+	fi
+	if [ ! -f "$SCRIPT_CONFIG_FPATH" ]
+	then printf '' > "$SCRIPT_CONFIG_FPATH"
+	fi
+	chmod 644 "$SCRIPT_CONFIG_FPATH"
+
+    #Get a "clean" string for 'grep' & 'sed'#
+    newVal="$(_EscapeChars_ "$2")"
+
+	if ! grep -qE "^${1}=.*" "$SCRIPT_CONFIG_FPATH"
+	then
+		if echo "$2" | grep -qE '^(true|false)$'
+		then echo "${1}=${2}" >> "$SCRIPT_CONFIG_FPATH"
+		else echo "${1}='${2}'" >> "$SCRIPT_CONFIG_FPATH"
+		fi
+	elif ! grep -qE "^${1}=$newVal" "$SCRIPT_CONFIG_FPATH"
+	then
+		if echo "$2" | grep -qE '^(true|false)$'
+		then
+			sed -i "s/${1}=.*/${1}=${2}/" "$SCRIPT_CONFIG_FPATH"
+		else
+			sed -i "s/${1}=.*/${1}='${newVal}'/" "$SCRIPT_CONFIG_FPATH"
+		fi
+	fi
+	return 0
+}
+
 #-----------------------------------------------------------#
 _CheckEmailConfigFileFromAMTM_()
 {
-   local msgType
+   local msgType  showMsg=true
+
    if [ $# -gt 0 ] && [ "$1" = "-check" ]
    then msgType="${REDct}**ERROR**${CLRct}"
    else msgType="${REDct}*WARNING*${CLRct}"
    fi
+   if [ $# -gt 1 ] && [ "$2" = "-quiet" ]
+   then showMsg=false
+   fi
+
    isEmailConfigEnabledInAMTM=false
 
    if [ ! -s "$AMTM_Mail_Conf_File" ] || [ ! -s "$AMTM_Mail_Pswd_File" ]
    then
-       _PrintMsg_ "\n${msgType}: Unable to send email notifications."
-       _PrintMsg_ "\n${MGNTct}AMTM email configuration file has not been set up.${CLRct}\n"
+       "$showMsg" && \
+       {
+         _PrintMsg_ "\n${msgType}: Unable to send email notifications."
+         _PrintMsg_ "\n${MGNTct}AMTM email configuration file has not been set up.${CLRct}\n"
+       }
        return 1
    fi
 
@@ -473,25 +587,16 @@ _CheckEmailConfigFileFromAMTM_()
       [ -z "$SMTP" ] || [ -z "$PORT" ] || [ -z "$PROTOCOL" ] || \
       [ -z "$emailPwEnc" ] || [ "$PASSWORD" = "PUT YOUR PASSWORD HERE" ]
    then
-       _PrintMsg_ "\n${msgType}: Unable to send email notifications."
-       _PrintMsg_ "\n${MGNTct}Some AMTM email configuration variables are found empty.${CLRct}\n"
+       "$showMsg" && \
+       {
+         _PrintMsg_ "\n${msgType}: Unable to send email notifications."
+         _PrintMsg_ "\n${MGNTct}Some AMTM email configuration variables are found empty.${CLRct}\n"
+       }
        return 1
    fi
 
    isEmailConfigEnabledInAMTM=true
    return 0
-}
-
-#-----------------------------------------------------------#
-_CheckScriptInstallation_()
-{
-   if [ -d "$SCRIPT_INSTALL_PATH" ] && \
-      [ -s "$theScriptFPath" ] && \
-      [ -s "$SCRIPT_CONFIG_FPATH" ]
-   then return 0
-   fi
-   _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Script [$SCRIPT_FNAME] is NOT properly set up.\n\n"
-   return 1
 }
 
 #-----------------------------------------------------------#
@@ -547,33 +652,59 @@ _DoScriptUpdate_()
    then return 1
    fi
    _AcquireEmailMutexFLock_
-   _CheckScriptVersionUpdate_ "$1"
-   _CheckCustomEmailLibraryScript_ "$1"
-   _ReleaseEmailMutexFLock_
+   _CheckScriptVersionUpdate_ "$@"
+   _CheckCustomEmailLibraryScript_ "$@"
+   _ReleaseEmailMutexFLock_ checkLockOK
 }
 
 #-----------------------------------------------------------#
-_UpdateToStableBranch_()
+_SwitchToStableBranch_()
 {
-   SCRIPT_GH_BRANCH="master"
-   SCRIPT_URL_REPO1="${SCRIPT_URL_BASE1}/${SCRIPT_GH_BRANCH}/EMail"
-   SCRIPT_URL_REPO2="${SCRIPT_URL_BASE2}/${SCRIPT_GH_BRANCH}/EMail"
+   SCRIPT_BRANCH='master'
+   SCRIPT_URL_REPO1="${SCRIPT_URL_BASE1}/$SCRIPT_BRANCH"
+   SCRIPT_URL_REPO2="${SCRIPT_URL_BASE2}/$SCRIPT_BRANCH"
    _DoScriptUpdate_ -force
 }
 
 #-----------------------------------------------------------#
-_UpdateToDevelopBranch_()
+_SwitchToDevelopBranch_()
 {
-   SCRIPT_GH_BRANCH="develop"
-   SCRIPT_URL_REPO1="${SCRIPT_URL_BASE1}/${SCRIPT_GH_BRANCH}/EMail"
-   SCRIPT_URL_REPO2="${SCRIPT_URL_BASE2}/${SCRIPT_GH_BRANCH}/EMail"
+   SCRIPT_BRANCH='develop'
+   SCRIPT_URL_REPO1="${SCRIPT_URL_BASE1}/$SCRIPT_BRANCH"
+   SCRIPT_URL_REPO2="${SCRIPT_URL_BASE2}/$SCRIPT_BRANCH"
    _DoScriptUpdate_ -force
+}
+
+#-----------------------------------------------------------#
+_DoScriptUpdateFromAMTM_()
+{
+   if [ $# -gt 0 ] && [ "$1" = "check" ]
+   then return 0
+   fi
+   _DoScriptUpdate_ -force
+   return 0
+}
+
+#-----------------------------------------------------------#
+_CheckScriptInstallation_()
+{
+   if [ -d "$SCRIPT_INSTALL_PATH" ] && \
+      [ -s "$theScriptFPath" ] && \
+      [ -s "$SCRIPT_CONFIG_FPATH" ]
+   then return 0
+   fi
+   if [ $# -eq 0 ] || [ -z "$1" ] || [ "$1" != "-quiet" ]
+   then
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Script [$SCRIPT_FNAME] is NOT properly set up.\n\n"
+   fi
+   return 1
 }
 
 #-----------------------------------------------------------#
 _ScriptInstallation_()
 {
-   local verStr  rawFPath
+   local verStr  rawFPath  retCode=0
+
    mkdir -m 755 -p "$SCRIPT_INSTALL_PATH"
    if [ ! -d "$SCRIPT_INSTALL_PATH" ]
    then
@@ -593,14 +724,23 @@ _ScriptInstallation_()
 
    verStr="${GRNct}$("$theScriptFPath" -getvers)${CLRct}"
    _PrintMsg_ "\nThe script ${GRNct}${SCRIPT_FNAME}${CLRct} version $verStr was installed.\n"
-   if [ ! -L "$theScriptSLink" ]
-   then echo
-   else _PrintMsg_ "Command to run the script: ${GRNct}${theScriptSLink}${CLRct}\n"
+
+   if ! _CheckEmailConfigFileFromAMTM_ -install
+   then
+       retCode=1
+       _PressAnyKey_
    fi
 
-   _CheckEmailConfigFileFromAMTM_ -install
-   _PressAnyKey_ ; _ShowUsageConcise_
-   return 0
+   if [ $# -lt 2 ] || [ -z "$2" ] || [ "$2" != "-quiet" ]
+   then
+       if [ ! -L "$theScriptSLink" ]
+       then echo
+       else _PrintMsg_ "Command to run the script: ${GRNct}${theScriptSLink}${CLRct}\n"
+       fi
+       _PressAnyKey_
+       _ShowUsageConcise_
+   fi
+   return "$retCode"
 }
 
 #-----------------------------------------------------------#
@@ -616,9 +756,6 @@ _ScriptUninstallation_()
    _PrintMsg_ "\nThe script ${GRNct}${SCRIPT_FNAME}${CLRct} was uninstalled.\n\n"
    return 0
 }
-
-#-----------------------------------------------------------#
-##**TBD??**## _EditConfigMenu_() { return 1 ; }
 
 #-----------------------------------------------------------#
 _DownloadScriptFile_()
@@ -720,7 +857,7 @@ _DownloadCustomEmailLibraryScript_()
    _PrintMsg_ "\n${actionStr1} the shared email library script to support email notifications...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
-   for theScriptURL in "$SCRIPT_URL_REPO1" "$SCRIPT_URL_REPO2"
+   for theScriptURL in "$EMAIL_LIB_REPO_URL1" "$EMAIL_LIB_REPO_URL2"
    do
        urlDLCount="$((urlDLCount + 1))"
        if _DownloadScriptFile_ "$theScriptURL" "$CUSTOM_EMAIL_LIB_SCRIPT_FNAME" "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH" "$urlDLCount"
@@ -761,7 +898,7 @@ _CheckScriptVersionUpdate_()
       if [ $# -eq 0 ] || [ -z "$1" ] ; then echo 0 ; return 1 ; fi
       local verNum  verStr
 
-      verStr="$(echo "$1" | sed "s/['\"]//g")"
+      verStr="$(echo "$1" | sed "s/[v'\"]//g")"
       verNum="$(echo "$verStr" | awk -F '.' '{printf ("%d%02d%02d\n", $1,$2,$3);}')"
       verNum="$(echo "$verNum" | sed 's/^0*//')"
       echo "$verNum" ; return 0
@@ -885,7 +1022,7 @@ _CheckCustomEmailLibraryScript_()
 }
 
 #-----------------------------------------------------------#
-_IsOptionalEmailArg_()
+_IsOptionalEmailArg_()   ##*TBD*: '-Attach='??##
 {
    if printf '%s\n' "$1" | grep -qE '^-(From|Title|Body|CCName|CCEmail)=.+'
    then return 0
@@ -894,7 +1031,7 @@ _IsOptionalEmailArg_()
 }
 
 #-----------------------------------------------------------#
-_CheckValidParam_()
+_CheckValidParams_()
 {
    if ! printf '%s\n' "$1" | grep -qE '^[-].+' || _IsOptionalEmailArg_ "$1" || \
       printf '%s\n' "$1" | grep -qE '^-(test|install|uninstall|checkupdate|forceupdate|stable|develop|showconf|version|getvers|html|ptext|quiet|silent|verbose)$'
@@ -951,7 +1088,8 @@ _Send_EMail_Msg_()
    ## ONLY for DEBUG/TEST purposes set to 'true' ##
    cemIsDebugMode=false
 
-   if [ -n "$emailCCName" ] && [ -n "$emailCCEmail" ]
+   if [ -n "$emailCCName" ] && [ "$emailCCName" != 'TBD' ] && \
+      [ -n "$emailCCEmail" ] && [ "$emailCCEmail" != 'TBD' ]
    then
        CC_NAME="$emailCCName" ; CC_ADDRESS="$emailCCEmail"
    fi
@@ -1003,6 +1141,8 @@ _Send_Email_TEST_()
        printf " is working well using the \"<b>${SCRIPT_TNAME}</b>\" script tool.\n\n"
     } > "$emailBodyTestFPath"
 
+    . "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
+
     _Send_EMail_Msg_ "$emailSubjectStr" -Body="$emailBodyTestFPath"
     retCode="$?"
 
@@ -1011,13 +1151,419 @@ _Send_Email_TEST_()
 }
 
 #-----------------------------------------------------------#
+_CenterTextStr_()
+{
+    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] || \
+       ! echo "$2" | grep -qE '^[1-9][0-9]+$'
+    then echo ; return 1
+    fi
+    local stringLen="${#1}"
+    local space1Len="$((($2 - stringLen)/2))"
+    local space2Len="$space1Len"
+    local totalLen="$((space1Len + stringLen + space2Len))"
+
+    if [ "$totalLen" -lt "$2" ]
+    then space2Len="$((space2Len + 1))"
+    elif [ "$totalLen" -gt "$2" ]
+    then space1Len="$((space1Len - 1))"
+    fi
+    if [ "$space1Len" -gt 0 ] && [ "$space2Len" -gt 0 ]
+    then printf "%*s%s%*s" "$space1Len" '' "$1" "$space2Len" ''
+    else printf "%s" "$1"
+    fi
+}
+
+#-----------------------------------------------------------#
+_ShowMenuHeader_()
+{
+   local spaceLen=50  colorCT
+   [ "$SCRIPT_BRANCH" = 'master' ] && colorCT="$GRNct" || colorCT="$MGNTct"
+   clear ; echo
+   printf "${BOLDct}##====================================================##${CLRct}\n"
+   printf "${BOLDct}##                   ${GRNct}SendEmail Tool${CLRct}                   ${BOLDct}##${CLRct}\n"
+   printf "${BOLDct}##                   --------------                   ##${CLRct}\n"
+   printf "${BOLDct}## ${CYANct}%s${CLRct}${BOLDct} ##${CLRct}\n" "$(_CenterTextStr_ "$versionStrTAG" "$spaceLen")"
+   printf "${BOLDct}## ${colorCT}%s${CLRct}${BOLDct} ##${CLRct}\n" "$(_CenterTextStr_ "$branchxStrTAG" "$spaceLen")"
+   printf "${BOLDct}##====================================================##${CLRct}\n\n"
+}
+
+#-----------------------------------------------------------#
+_InvalidMenuOptionHandler_()
+{
+	if [ -n "$menuSelection" ]
+	then printf "\n Invalid input [${REDct}${menuSelection}${CLRct}]"
+	fi
+	printf "\n Select a valid menu option\n"
+	_PressAnyKey_
+}
+
+#-----------------------------------------------------------#
+_InvalidEmailOptionHandler_()
+{
+	printf "\n The email notification options are ${MGNTct}NOT${CLRct} available."
+	printf "\n AMTM email configuration file MUST be set up first.\n"
+	_PressAnyKey_
+}
+
+#-----------------------------------------------------------#
+_ToggleEmailFormatType_()
+{
+	if ! "$cemIsFormatHTML"
+	then _SetScriptConfigOption_ 'cemIsFormatHTML' true
+	else _SetScriptConfigOption_ 'cemIsFormatHTML' false
+	fi
+	cemIsFormatHTML="$(_GetScriptConfigOption_ 'cemIsFormatHTML' true)"
+}
+
+#-----------------------------------------------------------#
+_SetFromSenderID_()
+{
+    printf "\n\n**DEBUG-TBD**: TO BE DONE\n\n"
+    _PressAnyKey_
+    return 0
+}
+
+#-----------------------------------------------------------#
+_SetSecondaryEmailAddress_()
+{
+   local currCC_NameOpt  currCC_AddrOpt
+   local nextCC_NameOpt  nextCC_AddrOpt
+   local currCC_NameStr="Current Name/Alias:"
+   local currCC_AddrStr="Current Address:"
+   local invalidChars='[][" *?\\]'   #Avoid parsing issues#
+   local clearOptStr="${GRNct}C${CLRct}=Clear/Remove Setting"
+   local doReturnToMenu  doClearSetting  minCharLen  maxCharLen  curCharLen
+   local menuExitStr="${GRNct}e${CLRct}=Go back"
+
+   currCC_NameOpt="$(_GetScriptConfigOption_ 'emailCCName')"
+   currCC_AddrOpt="$(_GetScriptConfigOption_ 'emailCCEmail')"
+
+   if [ -z "$currCC_AddrOpt" ] || [ "$currCC_AddrOpt" = "TBD" ]
+   then
+       nextCC_AddrOpt=""  currCC_AddrOpt=""
+       currCC_AddrStr="Currently ${YLWct}NONE${CLRct}"
+   else
+       nextCC_AddrOpt="$currCC_AddrOpt"
+       currCC_AddrStr="$currCC_AddrStr ${GRNct}${currCC_AddrOpt}${CLRct}"
+   fi
+   currCC_AddrStr="$(echo "$currCC_AddrStr" | sed 's/%/%%/g')"
+
+   userInput=""
+   minCharLen=10
+   maxCharLen=64
+   doReturnToMenu=false
+   doClearSetting=false
+
+   while true
+   do
+       printf "\nEnter a secondary email address to receive email notifications.\n"
+       if [ -z "$currCC_AddrOpt" ]
+       then printf "[${menuExitStr}]\n"
+       else printf "[${menuExitStr}] [${clearOptStr}]\n"
+       fi
+       printf "[${currCC_AddrStr}]:  "
+       read -r userInput
+
+       [ -z "$userInput" ] && break
+
+       if printf '%s\n' "$userInput" | grep -qE '^(e|exit|Exit)$'
+       then doReturnToMenu=true ; break ; fi
+
+       if printf '%s\n' "$userInput" | grep -qE '^(C|c)$'
+       then doClearSetting=true ; break ; fi
+
+       if ! printf '%s\n' "$userInput" | grep -qE '.+[@].+'
+       then
+           printf "\n${REDct}INVALID input.${CLRct}\n"
+           printf "Ampersand character [${GRNct}@${CLRct}] was NOT found, or it's found at the wrong place.\n"
+           _PressAnyKey_ ; echo
+           continue
+       fi
+
+       # Catch invalid chars that may cause parsing errors #
+       if printf '%s\n' "$userInput" | grep -qE "$invalidChars"
+       then
+           printf "\n${REDct}INVALID input.${CLRct}\n"
+           printf "One or more invalid characters were found.\n"
+           _PressAnyKey_ ; echo
+           continue
+       fi
+
+       curCharLen="${#userInput}"
+       if [ "$curCharLen" -lt "$minCharLen" ] || [ "$curCharLen" -gt "$maxCharLen" ]
+       then
+           printf "\n${REDct}INVALID input length${CLRct} "
+           printf "[Minimum=${GRNct}${minCharLen}${CLRct}, Maximum=${GRNct}${maxCharLen}${CLRct}]\n"
+           _PressAnyKey_ ; echo
+           continue
+       fi
+
+       nextCC_AddrOpt="$userInput"
+       break
+   done
+
+   if "$doReturnToMenu" || \
+      { [ -z "$nextCC_AddrOpt" ] && [ -z "$currCC_AddrOpt" ] ; }
+   then return 0 ; fi   ##NO Change##
+
+   if "$doClearSetting" || \
+      { [ -z "$nextCC_AddrOpt" ] && [ -n "$currCC_AddrOpt" ] ; }
+   then
+       _SetScriptConfigOption_ 'emailCCName' TBD
+       _SetScriptConfigOption_ 'emailCCEmail' TBD
+       printf "\nThe secondary email address and associated name/alias were removed successfully.\n"
+       _PressAnyKey_
+       return 0
+   fi
+
+   if [ -z "$currCC_NameOpt" ] || [ "$currCC_NameOpt" = "TBD" ]
+   then
+       currCC_NameOpt=""
+       nextCC_NameOpt="${nextCC_AddrOpt%%@*}"
+       currCC_NameStr="$currCC_NameStr ${GRNct}${nextCC_NameOpt}${CLRct}"
+   else
+       nextCC_NameOpt="$currCC_NameOpt"
+       currCC_NameStr="$currCC_NameStr ${GRNct}${currCC_NameOpt}${CLRct}"
+   fi
+   currCC_NameStr="$(echo "$currCC_NameStr" | sed 's/%/%%/g')"
+
+   userInput=""
+   minCharLen=6
+   maxCharLen=64
+   doReturnToMenu=false
+
+   while true
+   do
+       printf "\nEnter a name or alias for the secondary email address.\n"
+       printf "[${menuExitStr}]\n[${currCC_NameStr}]:  "
+       read -r userInput
+
+       if [ -z "$userInput" ] || \
+          printf '%s\n' "$userInput" | grep -qE '^(e|exit|Exit)$'
+       then doReturnToMenu=true ; break ; fi
+
+       # Catch invalid chars that may cause parsing errors #
+       if printf '%s\n' "$userInput" | grep -qE "$invalidChars"
+       then
+           printf "\n${REDct}INVALID input.${CLRct}\n"
+           printf "One or more invalid characters were found.\n"
+           _PressAnyKey_ ; echo
+           continue
+       fi
+
+       curCharLen="${#userInput}"
+       if [ "$curCharLen" -lt "$minCharLen" ] || [ "$curCharLen" -gt "$maxCharLen" ]
+       then
+           printf "\n${REDct}INVALID input length${CLRct} "
+           printf "[Minimum=${GRNct}${minCharLen}${CLRct}, Maximum=${GRNct}${maxCharLen}${CLRct}]\n"
+           _PressAnyKey_ ; echo
+           continue
+       fi
+
+       nextCC_NameOpt="$userInput"
+       break;
+   done
+
+   if [ "$nextCC_NameOpt" = "$currCC_NameOpt" ] && \
+      [ "$nextCC_AddrOpt" = "$currCC_AddrOpt" ]
+   then
+       printf "\nThe secondary email address and associated name/alias remain unchanged.\n"
+   else
+       _SetScriptConfigOption_ 'emailCCName' "$nextCC_NameOpt"
+       _SetScriptConfigOption_ 'emailCCEmail' "$nextCC_AddrOpt"
+       printf "\nThe secondary email address and associated name/alias were updated successfully.\n"
+   fi
+   _PressAnyKey_
+   return 0
+}
+
+#-----------------------------------------------------------#
+_ConfigurationOptionsMenu_()
+{
+    local menuSelection=""
+    local statusSTR  numberCT  optionCT  configOptsUpdated=false
+
+    . "$SCRIPT_CONFIG_FPATH"
+
+	while true
+	do
+		_ShowMenuHeader_
+        printf "     ${BOLDUNDERLN}${GRNct}Configuration Options${CLRct}\n"
+
+        _CheckEmailConfigFileFromAMTM_ -check -quiet
+        if "$isEmailConfigEnabledInAMTM"
+        then numberCT="$GRNct" ; optionCT=' '
+        else numberCT="$GRAYEDct" ; optionCT="$GRAYEDct "
+        fi
+
+        printf "\n ${numberCT} 1${CLRct}.${optionCT}Toggle Email Format Type ${CLRct}\n"
+        if "$isEmailConfigEnabledInAMTM"
+        then
+            if "$cemIsFormatHTML"
+            then statusSTR="${GRNct}HTML"
+            else statusSTR="${MGNTct}Plain Text"
+            fi
+            printf "     [Current Format: ${statusSTR}${CLRct}]\n"
+        fi
+
+        printf "\n ${numberCT} 2${CLRct}.${optionCT}Set Email Secondary Address ${CLRct}\n"
+        if "$isEmailConfigEnabledInAMTM"
+        then
+            if [ -n "$emailCCName" ] && [ "$emailCCName" != 'TBD' ] && \
+               [ -n "$emailCCEmail" ] && [ "$emailCCEmail" != 'TBD' ]
+            then
+			    printf "     [Current Name/Alias: ${GRNct}%s${CLRct}]\n" "$emailCCName"
+			    printf "     [Current 2nd Address: ${GRNct}%s${CLRct}]\n" "$emailCCEmail"
+            else
+			    printf "     [Currently ${YLWct}NONE${CLRct}]\n"
+            fi
+        fi
+
+        printf "\n ${numberCT} 3${CLRct}.${optionCT}Test email notification setup ${CLRct}\n"
+
+		printf "\n  ${GRNct}e${CLRct}. Back to Main Menu\n\n"
+		printf " Enter selection: "
+		read -r menuSelection
+
+		case "$menuSelection" in
+			1)
+				if "$isEmailConfigEnabledInAMTM"
+				then _ToggleEmailFormatType_
+				else _InvalidEmailOptionHandler_
+				fi
+				;;
+			2)
+				if "$isEmailConfigEnabledInAMTM"
+				then
+                    _SetSecondaryEmailAddress_
+                    emailCCName="$(_GetScriptConfigOption_ 'emailCCName')"
+                    emailCCEmail="$(_GetScriptConfigOption_ 'emailCCEmail')"
+				else
+                    _InvalidEmailOptionHandler_
+				fi
+				;;
+			3)
+				if "$isEmailConfigEnabledInAMTM"
+				then
+                    _Send_Email_TEST_
+                    _PressAnyKey_
+				else
+                    _InvalidEmailOptionHandler_
+				fi
+				;;
+			[Ee]) break ;;
+			*)
+                _InvalidMenuOptionHandler_
+				;;
+		esac
+    done
+}
+
+#-----------------------------------------------------------#
+_MainMenuHandling_()
+{
+   local menuSelection=""  branchSwitchStr  installedOK
+   local scriptFilePath="$1"
+
+   if _CheckScriptInstallation_ -quiet
+   then installedOK=true
+   else installedOK=false
+   fi
+
+   while true
+   do
+       _ShowMenuHeader_
+       printf "      ${BOLDUNDERLN}${GRNct}Main Menu${CLRct}\n\n"
+
+       if [ "$SCRIPT_BRANCH" = 'master' ]
+       then branchSwitchStr="${MGNTct}development"
+       else branchSwitchStr="${GRNct}stable/production"
+       fi
+
+       printf "   ${GRNct}1${CLRct}. Install/reinstall script\n"
+       if "$installedOK"
+       then
+           printf "   ${GRNct}2${CLRct}. Check for available updates\n"
+           printf "   ${GRNct}3${CLRct}. Force update to the latest version\n\n"
+           printf "  ${GRNct}sw${CLRct}. Switch to the ${branchSwitchStr}${CLRct} version\n\n"
+           printf "  ${GRNct}cf${CLRct}. Script configuration options\n"
+           
+       fi
+       printf "\n  ${GRNct}un${CLRct}. Uninstall script\n"
+       printf "\n   ${GRNct}e${CLRct}. Exit\n\n"
+       printf " Enter selection: "
+       read -r menuSelection
+
+       case "$menuSelection" in
+           1) if _ScriptInstallation_ "$scriptFilePath" -quiet
+              then _PressAnyKey_
+              fi
+              if [ -f "$theScriptSLink" ]
+              then
+                  exec "$theScriptSLink"
+                  exit 0
+              fi
+              ;;
+          un) if ! _ConfirmYESorNO_ "\n Do you wish to continue with the uninstallation?"
+			  then continue
+			  fi
+              _ScriptUninstallation_ "$scriptFilePath"
+              exit 0
+              ;;
+          [Ee]) break ;;
+       esac
+
+       if ! "$installedOK"
+       then
+           _InvalidMenuOptionHandler_
+           continue
+       fi
+
+       case "$menuSelection" in
+           2)
+              _DoScriptUpdate_ -check
+              _PressAnyKey_
+              exec "$theScriptSLink"
+              exit 0
+              ;;
+           3) echo
+              _DoScriptUpdate_ -force
+              _PressAnyKey_
+			  exec "$theScriptSLink"
+              exit 0
+			  ;;
+          sw) echo
+              if [ "$SCRIPT_BRANCH" = 'develop' ]
+              then _SwitchToStableBranch_
+              else _SwitchToDevelopBranch_
+              fi
+              _PressAnyKey_
+              exec "$theScriptSLink"
+              exit 0
+              ;;
+          cf) _ConfigurationOptionsMenu_
+              ;;
+           *) _InvalidMenuOptionHandler_
+              ;;
+       esac
+   done
+}
+
+#-----------------------------------------------------------#
+quietARG=""
 showUsage=false
 usageLong=false
 
-if [ $# -eq 0 ] || [ -z "$1" ] || printf '%s\n' "$1" | grep -qE '^[-]?help$'
+if [ $# -eq 0 ] || [ -z "$1" ]
+then
+    _MainMenuHandling_ "$0"
+    exit 0
+fi
+
+if printf '%s\n' "$1" | grep -qE '^[-]?help$'
 then
     showUsage=true ; usageLong=true
-elif ! _CheckValidParam_ "$1"
+elif ! _CheckValidParams_ "$1"
 then
     _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: INVALID argument [${REDct}${1}${CLRct}] was provided.\n"
     showUsage=true ; _PressAnyKey_
@@ -1050,19 +1596,24 @@ case "$1" in
         exit "$?"
         ;;
     -stable)
-        _UpdateToStableBranch_
+        _SwitchToStableBranch_
         exit 0
         ;;
     -develop)
-        _UpdateToDevelopBranch_
+        _SwitchToDevelopBranch_
         exit 0
         ;;
     -showconf)
         _ShowConfigDefaultsFile_
         exit 0
         ;;
-    *) ##CONTINUE##
-       ;;
+    amtmupdate)
+        shift
+        _DoScriptUpdateFromAMTM_ "$@"
+        exit "$?"
+        ;;
+     *) ##CONTINUE##
+        ;;
 esac
 
 if ! _CheckScriptInstallation_
@@ -1070,7 +1621,6 @@ then exit 1
 fi
 . "$SCRIPT_CONFIG_FPATH"
 
-quietARG=""
 theListOfARGs=""
 
 for PARAM in "$@"
@@ -1149,7 +1699,6 @@ then
 fi
 
 ! _CheckEmailConfigFileFromAMTM_ -check && exit 1
-. "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
 
 if [ "$1" = "-test" ]
 then
@@ -1164,6 +1713,8 @@ then
     _PressAnyKey_ ; _ShowUsageConcise_
     exit 1
 fi
+
+. "$CUSTOM_EMAIL_LIB_SCRIPT_FPATH"
 
 _Send_EMail_Msg_ "$@"
 exit "$?"
