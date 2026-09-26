@@ -8,7 +8,7 @@
 #---------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Sep-20 [Martinski W.]
+# Last Modified: 2026-Sep-25 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -16,8 +16,8 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="1.0.1"
-CEM_LIB_VERSTAG="26092023"
+CEM_LIB_VERSION="v1.0.2"
+CEM_LIB_VERSTAG="26092520"
 
 CEM_LIB_REPO_BRANCH="master"
 CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
@@ -219,7 +219,7 @@ _VersionStrToNum_CEM_()
    fi
    local verNum  verStr
 
-   verStr="$(echo "$1" | sed "s/['\"]//g")"
+   verStr="$(echo "$1" | sed "s/[v'\"]//g")"
    verNum="$(echo "$verStr" | awk -F '.' '{printf ("%d%02d%02d\n", $1,$2,$3);}')"
    verNum="$(echo "$verNum" | sed 's/^0*//')"
    echo "$verNum" ; return 0
