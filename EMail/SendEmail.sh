@@ -13,15 +13,15 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Jun-14 [Martinski W.]
-# Last Modified: 2026-Sep-25 [Martinski W.]
+# Last Modified: 2026-Sep-27 [Martinski W.]
 #####################################################################
 set -u
 
-readonly SCRIPT_VERSION="v0.9.1"
-readonly SCRIPT_VERSTAG="26092523"
+readonly SCRIPT_VERSION="v1.0.0"
+readonly SCRIPT_VERSTAG="26092700"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
-SCRIPT_BRANCH="develop"
+SCRIPT_BRANCH="develop"   ##**SET to "master" for RELEASE**##
 
 # Give FIRST priority to built-in binaries over any other #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -534,13 +534,13 @@ _SetScriptConfigOption_()
 
 	if ! grep -qE "^${1}=.*" "$SCRIPT_CONFIG_FPATH"
 	then
-		if echo "$2" | grep -qE '^(true|false)$'
+		if printf '%s\n' "$2" | grep -qE '^(true|false)$'
 		then echo "${1}=${2}" >> "$SCRIPT_CONFIG_FPATH"
 		else echo "${1}='${2}'" >> "$SCRIPT_CONFIG_FPATH"
 		fi
 	elif ! grep -qE "^${1}=$newVal" "$SCRIPT_CONFIG_FPATH"
 	then
-		if echo "$2" | grep -qE '^(true|false)$'
+		if printf '%s\n' "$2" | grep -qE '^(true|false)$'
 		then
 			sed -i "s/${1}=.*/${1}=${2}/" "$SCRIPT_CONFIG_FPATH"
 		else
@@ -703,7 +703,7 @@ _CheckScriptInstallation_()
 #-----------------------------------------------------------#
 _ScriptInstallation_()
 {
-   local verStr  rawFPath  retCode=0
+   local verStr  rawFPath  retCode=0  doKeyPress=true
 
    mkdir -m 755 -p "$SCRIPT_INSTALL_PATH"
    if [ ! -d "$SCRIPT_INSTALL_PATH" ]
@@ -725,20 +725,20 @@ _ScriptInstallation_()
    verStr="${GRNct}$("$theScriptFPath" -getvers)${CLRct}"
    _PrintMsg_ "\nThe script ${GRNct}${SCRIPT_FNAME}${CLRct} version $verStr was installed.\n"
 
+   _AcquireEmailMutexFLock_
+   _CheckCustomEmailLibraryScript_ -check
+   _ReleaseEmailMutexFLock_ checkLockOK
+
    if ! _CheckEmailConfigFileFromAMTM_ -install
    then
        retCode=1
        _PressAnyKey_
+       doKeyPress=false
    fi
+   "$doKeyPress" && _PressAnyKey_
 
-   if [ $# -lt 2 ] || [ -z "$2" ] || [ "$2" != "-quiet" ]
-   then
-       if [ ! -L "$theScriptSLink" ]
-       then echo
-       else _PrintMsg_ "Command to run the script: ${GRNct}${theScriptSLink}${CLRct}\n"
-       fi
-       _PressAnyKey_
-       _ShowUsageConcise_
+   if [ -L "$theScriptSLink" ]
+   then exec "$theScriptSLink"
    fi
    return "$retCode"
 }
@@ -1093,7 +1093,9 @@ _Send_EMail_Msg_()
    then
        CC_NAME="$emailCCName" ; CC_ADDRESS="$emailCCEmail"
    fi
-   [ -n "$emailSenderID" ] && FROM_NAME="$emailSenderID"
+   if [ -n "$emailSenderID" ] && [ "$emailSenderID" != 'TBD' ]
+   then FROM_NAME="$emailSenderID"
+   fi
    [ -n "$emailBodyTitle" ] && emailBodyTitleStr="$emailBodyTitle"
 
    _SendEMailNotification_CEM_ "$1" -F="$emailBodySendFPath" "$emailBodyTitleStr"
@@ -1216,11 +1218,95 @@ _ToggleEmailFormatType_()
 }
 
 #-----------------------------------------------------------#
-_SetFromSenderID_()
+_SetFromEmailSenderID_()
 {
-    printf "\n\n**DEBUG-TBD**: TO BE DONE\n\n"
-    _PressAnyKey_
-    return 0
+   local currFromSenderID  nextFromSenderID
+   local currSenderIDstr="Currently:"
+   local invalidChars='[][" *?\\]'   #Avoid parsing issues#
+   local menuExitStr="${GRNct}e${CLRct}=Go back"
+   local clearOptStr="${GRNct}C${CLRct}=Clear/Remove Setting"
+   local doReturnToMenu  doClearSetting  minCharLen  maxCharLen  curCharLen
+
+   currFromSenderID="$(_GetScriptConfigOption_ 'emailSenderID')"
+   
+   if [ -z "$currFromSenderID" ] || [ "$currFromSenderID" = "TBD" ]
+   then
+       nextFromSenderID=""  currFromSenderID=""
+       currSenderIDstr="Currently ${YLWct}NONE${CLRct}"
+   else
+       nextFromSenderID="$currFromSenderID"
+       currSenderIDstr="$currSenderIDstr ${GRNct}${currFromSenderID}${CLRct}"
+   fi
+   currSenderIDstr="$(echo "$currSenderIDstr" | sed 's/%/%%/g')"
+
+   userInput=""
+   minCharLen=6
+   maxCharLen=64
+   doReturnToMenu=false
+   doClearSetting=false
+
+   while true
+   do
+       printf "\nEnter a sender ID to be used in the email 'From:' field.\n"
+       if [ -z "$currFromSenderID" ]
+       then printf "[${menuExitStr}]\n"
+       else printf "[${menuExitStr}] [${clearOptStr}]\n"
+       fi
+       printf "[${currSenderIDstr}]:  "
+       read -r userInput
+
+       [ -z "$userInput" ] && break
+
+       if printf '%s\n' "$userInput" | grep -qE '^(e|exit|Exit)$'
+       then doReturnToMenu=true ; break ; fi
+
+       if printf '%s\n' "$userInput" | grep -qE '^(C|c)$'
+       then doClearSetting=true ; break ; fi
+
+       # Catch invalid chars that may cause parsing errors #
+       if printf '%s\n' "$userInput" | grep -qE "$invalidChars"
+       then
+           printf "\n${REDct}INVALID input.${CLRct}\n"
+           printf "One or more invalid characters were found.\n"
+           _PressAnyKey_ ; echo
+           continue
+       fi
+
+       curCharLen="${#userInput}"
+       if [ "$curCharLen" -lt "$minCharLen" ] || [ "$curCharLen" -gt "$maxCharLen" ]
+       then
+           printf "\n${REDct}INVALID input length${CLRct} "
+           printf "[Minimum=${GRNct}${minCharLen}${CLRct}, Maximum=${GRNct}${maxCharLen}${CLRct}]\n"
+           _PressAnyKey_ ; echo
+           continue
+       fi
+
+       nextFromSenderID="$userInput"
+       break
+   done
+
+   if "$doReturnToMenu" || \
+      { [ -z "$nextFromSenderID" ] && [ -z "$currFromSenderID" ] ; }
+   then return 0 ; fi   ##NO Change##
+
+   if "$doClearSetting" || \
+      { [ -z "$nextFromSenderID" ] && [ -n "$currFromSenderID" ] ; }
+   then
+       _SetScriptConfigOption_ 'emailSenderID' TBD
+       printf "\nThe 'From:' email sender ID was removed successfully.\n"
+       _PressAnyKey_
+       return 0
+   fi
+
+   if [ "$nextFromSenderID" = "$currFromSenderID" ]
+   then
+       printf "\nThe 'From:' email sender ID remains unchanged.\n"
+   else
+       _SetScriptConfigOption_ 'emailSenderID' "$nextFromSenderID"
+       printf "\nThe 'From:' email sender ID was updated successfully.\n"
+   fi
+   _PressAnyKey_
+   return 0
 }
 
 #-----------------------------------------------------------#
@@ -1231,9 +1317,9 @@ _SetSecondaryEmailAddress_()
    local currCC_NameStr="Current Name/Alias:"
    local currCC_AddrStr="Current Address:"
    local invalidChars='[][" *?\\]'   #Avoid parsing issues#
+   local menuExitStr="${GRNct}e${CLRct}=Go back"
    local clearOptStr="${GRNct}C${CLRct}=Clear/Remove Setting"
    local doReturnToMenu  doClearSetting  minCharLen  maxCharLen  curCharLen
-   local menuExitStr="${GRNct}e${CLRct}=Go back"
 
    currCC_NameOpt="$(_GetScriptConfigOption_ 'emailCCName')"
    currCC_AddrOpt="$(_GetScriptConfigOption_ 'emailCCEmail')"
@@ -1388,7 +1474,7 @@ _ConfigurationOptionsMenu_()
 	while true
 	do
 		_ShowMenuHeader_
-        printf "     ${BOLDUNDERLN}${GRNct}Configuration Options${CLRct}\n"
+        printf "     ${BOLDUNDERLN}${GRNct}Email Configuration Options${CLRct}\n"
 
         _CheckEmailConfigFileFromAMTM_ -check -quiet
         if "$isEmailConfigEnabledInAMTM"
@@ -1396,61 +1482,56 @@ _ConfigurationOptionsMenu_()
         else numberCT="$GRAYEDct" ; optionCT="$GRAYEDct "
         fi
 
-        printf "\n ${numberCT} 1${CLRct}.${optionCT}Toggle Email Format Type ${CLRct}\n"
-        if "$isEmailConfigEnabledInAMTM"
+        printf "\n ${GRNct} 1${CLRct}. Toggle email format type\n"
+        if "$cemIsFormatHTML"
+        then statusSTR="${GRNct}HTML"
+        else statusSTR="${MGNTct}Plain Text"
+        fi
+        printf "     [Currently: ${statusSTR}${CLRct}]\n"
+
+        printf "\n ${GRNct} 2${CLRct}. Set 'From:' email sender ID\n"
+        if [ -n "$emailSenderID" ] && [ "$emailSenderID" != 'TBD' ]
         then
-            if "$cemIsFormatHTML"
-            then statusSTR="${GRNct}HTML"
-            else statusSTR="${MGNTct}Plain Text"
-            fi
-            printf "     [Current Format: ${statusSTR}${CLRct}]\n"
+            printf "     [Currently: ${GRNct}%s${CLRct}]\n" "$emailSenderID"
+        else
+            printf "     [Currently ${YLWct}NONE${CLRct}]\n"
         fi
 
-        printf "\n ${numberCT} 2${CLRct}.${optionCT}Set Email Secondary Address ${CLRct}\n"
-        if "$isEmailConfigEnabledInAMTM"
+        printf "\n ${GRNct} 3${CLRct}. Set email secondary address\n"
+        if [ -n "$emailCCName" ] && [ "$emailCCName" != 'TBD' ] && \
+           [ -n "$emailCCEmail" ] && [ "$emailCCEmail" != 'TBD' ]
         then
-            if [ -n "$emailCCName" ] && [ "$emailCCName" != 'TBD' ] && \
-               [ -n "$emailCCEmail" ] && [ "$emailCCEmail" != 'TBD' ]
-            then
-			    printf "     [Current Name/Alias: ${GRNct}%s${CLRct}]\n" "$emailCCName"
-			    printf "     [Current 2nd Address: ${GRNct}%s${CLRct}]\n" "$emailCCEmail"
-            else
-			    printf "     [Currently ${YLWct}NONE${CLRct}]\n"
-            fi
+            printf "     [Current Name/Alias: ${GRNct}%s${CLRct}]\n" "$emailCCName"
+            printf "     [Current 2nd Address: ${GRNct}%s${CLRct}]\n" "$emailCCEmail"
+        else
+            printf "     [Currently ${YLWct}NONE${CLRct}]\n"
         fi
 
-        printf "\n ${numberCT} 3${CLRct}.${optionCT}Test email notification setup ${CLRct}\n"
+        printf "\n ${numberCT} 4${CLRct}.${optionCT}Test email notification setup ${CLRct}\n"
 
 		printf "\n  ${GRNct}e${CLRct}. Back to Main Menu\n\n"
 		printf " Enter selection: "
 		read -r menuSelection
 
 		case "$menuSelection" in
-			1)
-				if "$isEmailConfigEnabledInAMTM"
-				then _ToggleEmailFormatType_
-				else _InvalidEmailOptionHandler_
-				fi
-				;;
-			2)
-				if "$isEmailConfigEnabledInAMTM"
-				then
-                    _SetSecondaryEmailAddress_
-                    emailCCName="$(_GetScriptConfigOption_ 'emailCCName')"
-                    emailCCEmail="$(_GetScriptConfigOption_ 'emailCCEmail')"
-				else
-                    _InvalidEmailOptionHandler_
-				fi
-				;;
-			3)
-				if "$isEmailConfigEnabledInAMTM"
-				then
-                    _Send_Email_TEST_
-                    _PressAnyKey_
-				else
-                    _InvalidEmailOptionHandler_
-				fi
-				;;
+			1) _ToggleEmailFormatType_
+               ;;
+			2) _SetFromEmailSenderID_
+               emailSenderID="$(_GetScriptConfigOption_ 'emailSenderID')"
+               ;;
+			3) _SetSecondaryEmailAddress_
+               emailCCName="$(_GetScriptConfigOption_ 'emailCCName')"
+               emailCCEmail="$(_GetScriptConfigOption_ 'emailCCEmail')"
+               ;;
+			4) if "$isEmailConfigEnabledInAMTM"
+               then
+                   _Send_Email_TEST_
+               else
+                   printf "\n Testing email notification setup is ${MGNTct}NOT${CLRct} available."
+	               printf "\n AMTM email configuration file MUST be set up first.\n"
+               fi
+               _PressAnyKey_
+               ;;
 			[Ee]) break ;;
 			*)
                 _InvalidMenuOptionHandler_
@@ -1476,7 +1557,7 @@ _MainMenuHandling_()
        printf "      ${BOLDUNDERLN}${GRNct}Main Menu${CLRct}\n\n"
 
        if [ "$SCRIPT_BRANCH" = 'master' ]
-       then branchSwitchStr="${MGNTct}development"
+       then branchSwitchStr="${YLWct}development"
        else branchSwitchStr="${GRNct}stable/production"
        fi
 
@@ -1486,7 +1567,7 @@ _MainMenuHandling_()
            printf "   ${GRNct}2${CLRct}. Check for available updates\n"
            printf "   ${GRNct}3${CLRct}. Force update to the latest version\n\n"
            printf "  ${GRNct}sw${CLRct}. Switch to the ${branchSwitchStr}${CLRct} version\n\n"
-           printf "  ${GRNct}cf${CLRct}. Script configuration options\n"
+           printf "  ${GRNct}cf${CLRct}. Configure default email options\n"
            
        fi
        printf "\n  ${GRNct}un${CLRct}. Uninstall script\n"
@@ -1495,14 +1576,8 @@ _MainMenuHandling_()
        read -r menuSelection
 
        case "$menuSelection" in
-           1) if _ScriptInstallation_ "$scriptFilePath" -quiet
-              then _PressAnyKey_
-              fi
-              if [ -f "$theScriptSLink" ]
-              then
-                  exec "$theScriptSLink"
-                  exit 0
-              fi
+           1) _ScriptInstallation_ "$scriptFilePath" -quiet
+              exit "$?"
               ;;
           un) if ! _ConfirmYESorNO_ "\n Do you wish to continue with the uninstallation?"
 			  then continue
