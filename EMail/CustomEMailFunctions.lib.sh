@@ -17,7 +17,7 @@ else return 0
 fi
 
 CEM_LIB_VERSION="v1.1.0"
-CEM_LIB_VERSTAG="26100300"
+CEM_LIB_VERSTAG="26100308"
 
 CEM_LIB_REPO_BRANCH="master"
 CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
@@ -438,6 +438,23 @@ _CheckValidParams_CEM_()
    fi
 }
 
+#-----------------------------------------------------------------------#
+_CheckMaxFileSize_CEM_()
+{
+   if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] || \
+      [ ! -s "$1" ] || ! echo "$2" | grep -qE '^[1-9][0-9]?MB$'
+   then return 1
+   fi
+   local theFileSize
+   local maxFileSizeNum="$(echo "$2" | sed 's/MB//')"
+
+   theFileSize="$(ls -1l "$1" | awk -F ' ' '{print $3}')"
+   if [ "$theFileSize" -gt "$((maxFileSizeNum * 1024 * 1024))" ]
+   then return 1
+   else return 0
+   fi
+}
+
 #-----------------------------------------------------------#
 _GetEmailAttachmentType_CEM_()
 {
@@ -486,14 +503,14 @@ _GetEmailAttachmentType_CEM_()
 #-------------------------------------------------------#
 # ARG1: Email Subject string.
 # ARG2: Email Body message string or the full path of
-#       a file containing the Email Body message.
+#       the file containing the email message body.
 # ARG3: Email Body Title string [OPTIONAL].
 # ARG4: Full path of email file attachment [OPTIONAL].
 #-------------------------------------------------------#
 _CreateEMailContent_CEM_()
 {
     if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
-    then return 1
+    then return 50
     fi
     local emailSubject="$1"  optionalARGs
     local emailBodyFile  emailBodyTitle=""
@@ -506,9 +523,9 @@ _CreateEMailContent_CEM_()
         emailBodyFile="${2##*=}"
         if [ ! -s "$emailBodyFile" ]
         then
-            logMsgStr="**ERROR**: Email body message file [$emailBodyFile] NOT found."
+            logMsgStr="**ERROR**: Email body file [$emailBodyFile] NOT found."
             _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
-            return 1
+            return 51
         fi
         cp -fp "$emailBodyFile" "$cemTmpEMailBodyMsg"
         chmod 666 "$cemTmpEMailBodyMsg"
@@ -525,7 +542,8 @@ _CreateEMailContent_CEM_()
         then
             logMsgStr="**ERROR**: INVALID argument [${PARAM}] was provided."
             _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
-            return 1
+            rm -f "$cemTmpEMailBodyMsg"
+            return 52
         fi
         if printf '%s\n' "$PARAM" | grep -qE '^-Title=.+'
         then
@@ -537,11 +555,21 @@ _CreateEMailContent_CEM_()
             then
                 logMsgStr="**ERROR**: Email file attachment [$emailAttachFPath] NOT found."
                 _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
-                return 1
+                rm -f "$cemTmpEMailBodyMsg"
+                return 53
             fi
             emailAttachFName="${emailAttachFPath##*/}"
             if ! _GetEmailAttachmentType_CEM_ "$emailAttachFName"
-            then return 1
+            then
+                rm -f "$cemTmpEMailBodyMsg"
+                return 54
+            fi
+            if ! _CheckMaxFileSize_CEM_ "$emailAttachFPath" 10MB
+            then
+                logMsgStr="**ERROR**: Email file attachment [$emailAttachFPath] exceeds maximum file size [10MB]."
+                _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+                rm -f "$cemTmpEMailBodyMsg"
+                return 55
             fi
             emailAttachmentOK=true
         else
@@ -552,6 +580,18 @@ _CreateEMailContent_CEM_()
 
     [ -n "$optionalARGs" ] && eval set -- "$optionalARGs"
     [ $# -gt 0 ] && [ -n "$1" ] && emailBodyTitle="$1"
+
+    if "$emailAttachmentOK"
+    then maxEmailBodySizeMB='5MB'
+    else maxEmailBodySizeMB='8MB'
+    fi
+    if ! _CheckMaxFileSize_CEM_ "$cemTmpEMailBodyMsg" "$maxEmailBodySizeMB"
+    then
+        logMsgStr="**ERROR**: Email message body exceeds maximum size [$maxEmailBodySizeMB]."
+        _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+        rm -f "$cemTmpEMailBodyMsg"
+        return 56
+    fi
 
     if "$cemIsFormatHTML"
     then
@@ -606,7 +646,7 @@ EOF
         printf "%s\n" "$emailBodyTitle" >> "$cemTmpEMailContent"
     fi
 
-    ## Email Body Message ##
+    ## Email Message Body ##
     cat "$cemTmpEMailBodyMsg" >> "$cemTmpEMailContent"
 
     ## Footer ##
@@ -656,7 +696,7 @@ EOF
 #-------------------------------------------------------#
 # ARG1: Email Subject string.
 # ARG2: Email Body message string or the full path of
-#       a file containing the Email Body message.
+#       the file containing the email message body.
 # ARG3: Email Body Title string [OPTIONAL].
 # ARG4: Full path of email file attachment [OPTIONAL].
 #-------------------------------------------------------#
@@ -666,7 +706,7 @@ _SendEMailNotification_CEM_()
       ! _CheckEMailConfigFileFromAMTM_CEM_
    then return 1 ; fi
 
-   local CC_ADDRESS_OK=""
+   local retCode  CC_ADDRESS_OK=""
    local theMsgStr  logMsgStr  logPrioNum  mailpswd
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
@@ -677,7 +717,8 @@ _SendEMailNotification_CEM_()
    then CC_ADDRESS_OK=TRUE
    fi
 
-   ! _CreateEMailContent_CEM_ "$@" && return 1
+   _CreateEMailContent_CEM_ "$@"
+   retCode="$?" ; [ "$retCode" -ne 0 ] && return "$retCode"
 
    if "$cemIsVerboseMode"
    then
@@ -689,7 +730,7 @@ _SendEMailNotification_CEM_()
    if [ -z "$mailpswd" ]
    then
        _LogMsg_CEM_ "**ERROR**: Failure to extract email password." "$cemSysLogERROR"
-       return 1
+       return 60
    fi
 
    printf '' > "$cemCurlErrLogFPath"
