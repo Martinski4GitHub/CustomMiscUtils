@@ -18,7 +18,7 @@ The **CustomEMailFunctions.lib.sh** script is free and open-source software lice
 
 Official CustomEMailFunctions.lib.sh releases are maintained through this repository:
 
-** https://github.com/Martinski4GitHub/CustomMiscUtils/tree/master/EMail **
+**https://github.com/Martinski4GitHub/CustomMiscUtils/tree/master/EMail**
 
 ### Project Author
 
@@ -36,5 +36,5 @@ https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils/master/EMail/
 -o /jffs/addons/shared-libs/CustomEMailFunctions.lib.sh && chmod a+x /jffs/addons/shared-libs/CustomEMailFunctions.lib.sh
 ```
 
-The shared Custom Email Library script is not a standalone script; it's a library meant to be "sourced" (i.e included) within a script so that its functionality can be accessed via the available function calls.
+The shared Custom Email Library script is not a standalone script; it's a library meant to be "sourced" (i.e. included) within a script so that its functionality can be accessed via the available function calls.
 
