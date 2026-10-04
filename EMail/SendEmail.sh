@@ -21,7 +21,7 @@ readonly SCRIPT_VERSION="v1.1.0"
 readonly SCRIPT_VERSTAG="26100322"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
-SCRIPT_BRANCH="develop"   ##**SET TO "master" FOR RELEASE**##
+SCRIPT_BRANCH="master"
 
 # Give FIRST priority to built-in binaries over any other #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -53,7 +53,7 @@ readonly theScriptSLink="${JFFS_SCRIPTS_DIR}/$SCRIPT_TNAME"
 readonly REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW"
 readonly REPO_URL_BASE1="https://raw.githubusercontent.com/Martinski4GitHub"
 
-readonly EMAIL_LIB_BRANCH="develop"   ##**SET TO "master" FOR RELEASE**##
+readonly EMAIL_LIB_BRANCH="master"
 readonly EMAIL_LIB_URL_BASE1="${REPO_URL_BASE1}/CustomMiscUtils"
 readonly EMAIL_LIB_URL_BASE2="${REPO_URL_BASE2}/CustomMiscUtils"
 readonly EMAIL_LIB_REPO_URL1="${EMAIL_LIB_URL_BASE1}/${EMAIL_LIB_BRANCH}/EMail"
