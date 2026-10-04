@@ -18,7 +18,7 @@
 set -u
 
 readonly SCRIPT_VERSION="v1.1.0"
-readonly SCRIPT_VERSTAG="26100300"
+readonly SCRIPT_VERSTAG="26100322"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 SCRIPT_BRANCH="develop"   ##**SET TO "master" FOR RELEASE**##
@@ -237,18 +237,18 @@ To send email notifications [the order of the arguments is important]:
 
 
   ${YLWct}----------------------------------------------------------------${CLRct}
-  Example calls using a simple one-line email body message string:
+  Example calls using a simple one-line email message body string:
   ${YLWct}----------------------------------------------------------------${CLRct}
    
-  ${GRNct}$SCRIPT_TNAME${CLRct} "Subject Line" "Simple Email Body Message String"
+  ${GRNct}$SCRIPT_TNAME${CLRct} "Subject Line" "Simple Email Message Body String"
 
-  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Simple Email Body Message String"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Simple Email Message Body String"
 
-  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Simple Email Body Message String" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
+  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Simple Email Message Body String" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
 
 
   ${YLWct}-------------------------------------------------------------------${CLRct}
-  Example calls using an email body message file with multiple lines:
+  Example calls using an email message body file with multiple lines:
   ${YLWct}-------------------------------------------------------------------${CLRct}
 
   {
@@ -288,9 +288,9 @@ OPTIONAL command-line argument switches:
 
   ${GRNct}$SCRIPT_TNAME ${CYANct}-test -ptext${CLRct}
 
-  ${GRNct}$SCRIPT_TNAME ${CYANct}-ptext${CLRct} "Subject Line" "Email Body Message String"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-ptext${CLRct} "Subject Line" "Email Message Body String"
 
-  ${GRNct}$SCRIPT_TNAME ${CYANct}-ptext -quiet${CLRct} ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Email Body Message String" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
+  ${GRNct}$SCRIPT_TNAME ${CYANct}-ptext -quiet${CLRct} ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" "Email Message Body String" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
 
 
 DEFAULT global values if not explicitly modified:
@@ -327,8 +327,6 @@ Author: Martinski W.
 The ${GRNct}SendEmail${CLRct} script is a CLI utility to send email notifications.
 It uses the shared Email Library script for the email functionality,
 and the AMTM email configuration file as the user-defined email setup.
-
-Example calls:
 
 To get full help and description of all command line arguments:
 
@@ -1108,7 +1106,7 @@ _Send_EMail_Msg_()
        emailBodyFile="${2##*=}"
        if [ ! -s "$emailBodyFile" ]
        then
-           _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Email body message file [${REDct}${emailBodyFile}${CLRct}] NOT found.\n"
+           _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Email body file [${REDct}${emailBodyFile}${CLRct}] NOT found.\n"
            return 1
        fi
        cp -fp "$emailBodyFile" "$emailBodySendFPath"
@@ -1120,7 +1118,7 @@ _Send_EMail_Msg_()
 
    if [ ! -s "$emailBodySendFPath" ]
    then
-       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Email body message file is EMPTY.\n"
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Email body file is EMPTY.\n"
        return 1
    fi
 
@@ -1142,7 +1140,7 @@ _Send_EMail_Msg_()
    then FROM_NAME="$emailSenderID"
    fi
 
-   _SendEMailNotification_CEM_ "$1" -F="$emailBodySendFPath" ${emailBodyTitle:+"$emailBodyTitle"} ${emailAttachFile:+-Attach="$emailAttachFile"}
+   _SendEMailNotification_CEM_ "$1" -F="$emailBodySendFPath" ${emailBodyTitle:+-Title="$emailBodyTitle"} ${emailAttachFile:+-Attach="$emailAttachFile"}
    retCode="$?"
 
    if [ "$retCode" -eq 0 ]
@@ -1156,7 +1154,7 @@ _Send_EMail_Msg_()
    else
        showErrorMsgs=true
        logTag="${REDct}**ERROR**${CLRct}: "
-       logMsg="Failure to send email notification [${MGNTct}${1}${CLRct}] [${REDct}Error Code: $retCode${CLRct}]."
+       logMsg="Failure to send email notification [${MGNTct}${1}${CLRct}] [${REDct}Error Code: ${retCode}${CLRct}]."
    fi
 
    if ! "$cemIsVerboseMode" || "$showErrorMsgs"
