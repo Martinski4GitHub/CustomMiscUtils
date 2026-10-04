@@ -18,10 +18,10 @@
 set -u
 
 readonly SCRIPT_VERSION="v1.1.0"
-readonly SCRIPT_VERSTAG="26100322"
+readonly SCRIPT_VERSTAG="26100323"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
-SCRIPT_BRANCH="develop"
+SCRIPT_BRANCH="master"
 
 # Give FIRST priority to built-in binaries over any other #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -328,11 +328,11 @@ The ${GRNct}SendEmail${CLRct} script is a CLI utility to send email notification
 It uses the shared Email Library script for the email functionality,
 and the AMTM email configuration file as the user-defined email setup.
 
-To get full help and description of all command line arguments:
+To get full help and description of all command-line arguments:
 
  ${GRNct}$SCRIPT_TNAME ${CYANct}-help${CLRct}
 
-Miscellaneous command line arguments:
+Miscellaneous command-line arguments:
 
  ${GRNct}$SCRIPT_TNAME ${CYANct}-version${CLRct}
  ${GRNct}$SCRIPT_TNAME ${CYANct}-install${CLRct}
@@ -356,13 +356,13 @@ To send simple email notifications:
  ${GRNct}$SCRIPT_TNAME${CLRct} "SubjectLine" ${MGNTct}-Body=${CLRct}"EmailBodyFILE"
  ${GRNct}$SCRIPT_TNAME${CLRct} "SubjectLine" ${MGNTct}-Body=${CLRct}"EmailBodyFILE" ${MGNTct}-Title=${CLRct}"EmailBodyTITLE"
 
-Optional command line email arguments:
+Optional command-line email arguments:
  
  ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" ...
  ${GRNct}$SCRIPT_TNAME ${MGNTct}-Attach=${CLRct}"/full/path/to/file/Attachment.txt" ...
  ${GRNct}$SCRIPT_TNAME ${MGNTct}-CCName=${CLRct}"CC_SenderID" ${MGNTct}-CCEmail=${CLRct}"CC_Address@email.com" ...
 
-Optional command line email argument switches:
+Optional command-line email argument switches:
 
  ${GRNct}$SCRIPT_TNAME${CLRct} ${CYANct}-html${CLRct} "SubjectLine" ...
  ${GRNct}$SCRIPT_TNAME${CLRct} ${CYANct}-ptext${CLRct} "SubjectLine" ...
