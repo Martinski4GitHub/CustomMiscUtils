@@ -8,7 +8,7 @@
 #---------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Sep-25 [Martinski W.]
+# Last Modified: 2026-Oct-03 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -16,8 +16,8 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="v1.0.2"
-CEM_LIB_VERSTAG="26092520"
+CEM_LIB_VERSION="v1.1.0"
+CEM_LIB_VERSTAG="26100308"
 
 CEM_LIB_REPO_BRANCH="master"
 CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
@@ -47,6 +47,7 @@ then cemDeleteMailContentFile=true ; fi
 cemScriptDirPath="$(/usr/bin/dirname "$0")"
 cemScriptFileName="${0##*/}"
 cemScriptFNameTag="${cemScriptFileName%.*}"
+cemPID="$(printf "%05d" "$$")"
 
 # The shared Custom Email Library Script #
 cemAddOnsSharedLibsDirPath="${CEM_ADDONS_DIR}/shared-libs"
@@ -54,9 +55,10 @@ cemCustomEmailLibScriptFName="CustomEMailFunctions.lib.sh"
 cemCustomEmailLibScriptFPath="${cemAddOnsSharedLibsDirPath}/$cemCustomEmailLibScriptFName"
 
 cemHTTPstatusStr="HTTP_Status_Code"
-cemCurlTmpLogFPath="${CEM_TEMP_DIR}/tmpEMailCurl_${cemScriptFNameTag}_$$.TMP.LOG"
-cemCurlErrLogFPath="${CEM_TEMP_DIR}/tmpEMailCurl_${cemScriptFNameTag}_$$.ERR.LOG"
-cemTmpEMailContent="${CEM_TEMP_DIR}/tmpEMailBodyC_${cemScriptFNameTag}_$$.TXT"
+cemCurlTmpLogFPath="${CEM_TEMP_DIR}/tmpEMailCurl_${cemScriptFNameTag}_${cemPID}.TMP.LOG"
+cemCurlErrLogFPath="${CEM_TEMP_DIR}/tmpEMailCurl_${cemScriptFNameTag}_${cemPID}.ERR.LOG"
+cemTmpEMailContent="${CEM_TEMP_DIR}/tmpEMailBodyCont_${cemScriptFNameTag}_${cemPID}.TXT"
+cemTmpEMailBodyMsg="${CEM_TEMP_DIR}/tmpEMailBodyMsge_${cemScriptFNameTag}_${cemPID}.MSG"
 cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
 
 cemNvramInitUSleep=10
@@ -64,7 +66,7 @@ cemNvramWaitUSleep=50
 cemNvramWaitFactor=20000
 cemNvramWaitSecMAX=2
 cemNvramWaitCntMAX="$((cemNvramWaitSecMAX * cemNvramWaitFactor))"
-cemNvramValTmpFPath="${CEM_TEMP_DIR}/nvramValue_${cemScriptFNameTag}_$$.TMP.TXT"
+cemNvramValTmpFPath="${CEM_TEMP_DIR}/cemNvramValue_${cemScriptFNameTag}_${cemPID}.TMP.TXT"
 
 cemSysLogALERT=1
 cemSysLogCRITC=2
@@ -161,7 +163,7 @@ _DownloadScriptFile_CEM_()
    then return 1
    fi
    local srcFilePathURL="${1}/$2"
-   local tempFilePathDL="${CEM_TEMP_DIR}/${2}.DL.$$.TMP"
+   local tempFilePathDL="${CEM_TEMP_DIR}/${2}.DL.${cemPID}.TMP"
    local theDestFName="$2"  theDestFPath="$3"
    local theMsgStr  logMsgStr
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
@@ -251,7 +253,7 @@ _CheckLibraryUpdates_CEM_()
    fi
 
    local cemScriptFPath="$cemCustomEmailLibScriptFPath"
-   local cemTmpFilePath="${CEM_TEMP_DIR}/${cemCustomEmailLibScriptFName}.$$.TMP.SH"
+   local cemTmpFilePath="${CEM_TEMP_DIR}/${cemCustomEmailLibScriptFName}.${cemPID}.TMP.SH"
    local scriptVerNum  dlFileVerNum  theVerStr
    local retCode  urlDLCount  urlDLMax
    local dlVersionStr  dlVersTagStr  scriptMD5  dlTempMD5
@@ -425,31 +427,171 @@ _CheckEMailConfigFileFromAMTM_CEM_()
    return 0
 }
 
+#-----------------------------------------------------------#
+_CheckValidParams_CEM_()
+{
+   if { ! printf '%s\n' "$1" | grep -qE '^[-].+' && \
+        ! printf '%s\n' "$1" | grep -qE '^(File|Title|Attach)=.+' ; } || \
+      printf '%s\n' "$1" | grep -qE '^-(File|Title|Attach)=.+'
+   then return 0
+   else return 1
+   fi
+}
+
+#-----------------------------------------------------------------------#
+_CheckMaxFileSize_CEM_()
+{
+   if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] || \
+      [ ! -s "$1" ] || ! echo "$2" | grep -qE '^[1-9][0-9]?MB$'
+   then return 1
+   fi
+   local theFileSize
+   local maxFileSizeNum="$(echo "$2" | sed 's/MB//')"
+
+   theFileSize="$(ls -1l "$1" | awk -F ' ' '{print $3}')"
+   if [ "$theFileSize" -gt "$((maxFileSizeNum * 1024 * 1024))" ]
+   then return 1
+   else return 0
+   fi
+}
+
+#-----------------------------------------------------------#
+_GetEmailAttachmentType_CEM_()
+{
+    if [ $# -eq 0 ] || [ -z "$1" ]
+    then return 1
+    fi
+    local retCode=0  theFileExt="${1##*.}"
+
+    emailAttachFType=""
+    case "$theFileExt" in
+        txt|log|cfg|conf|sh|js|json|TXT|LOG|CFG)
+            emailAttachFType='text/plain'
+            ;;
+        gif)
+            emailAttachFType='image/gif'
+            ;;
+        png)
+            emailAttachFType='image/png'
+            ;;
+        bmp)
+            emailAttachFType='image/bmp'
+            ;;
+        jpg|jpeg)
+            emailAttachFType='image/jpeg'
+            ;;
+        pdf)
+            emailAttachFType='application/pdf'
+            ;;
+        zip)
+            emailAttachFType='application/zip'
+            ;;
+        gzip)
+            emailAttachFType='application/gzip'
+            ;;
+        tar)
+            emailAttachFType='application/x-tar'
+            ;;
+        *) retCode=1
+           logMsgStr="**ERROR**: UNKNOWN email file attachment type [$theFileExt]."
+           _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+           ;;
+    esac
+    return "$retCode"
+}
+
 #-------------------------------------------------------#
 # ARG1: Email Subject string.
 # ARG2: Email Body message string or the full path of
-#       a file containing the Email Body message.
+#       the file containing the email message body.
 # ARG3: Email Body Title string [OPTIONAL].
+# ARG4: Full path of email file attachment [OPTIONAL].
 #-------------------------------------------------------#
 _CreateEMailContent_CEM_()
 {
     if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
-    then return 1
+    then return 50
     fi
-    local emailBodyMsge  emailBodyFile  emailBodyTitle=""
+    local emailSubject="$1"  optionalARGs
+    local emailBodyFile  emailBodyTitle=""
+    local emailAttachFPath=""  emailAttachFName=""
+    local emailAttachFType=""  emailAttachmentOK=false
+    local emailMixedBoundary='MULTIPART-MIXED-BOUNDARY'
 
-    printf '' > "$cemTmpEMailContent"
-
-    if ! echo "$2" | grep -qE '^-F=.+'
+    if printf '%s\n' "$2" | grep -qE '^-(F|File)=.+'
     then
-        emailBodyMsge="$2"
-    else
         emailBodyFile="${2##*=}"
-        emailBodyMsge="$(cat "$emailBodyFile")"
-        rm -f "$emailBodyFile"
+        if [ ! -s "$emailBodyFile" ]
+        then
+            logMsgStr="**ERROR**: Email body file [$emailBodyFile] NOT found."
+            _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+            return 51
+        fi
+        cp -fp "$emailBodyFile" "$cemTmpEMailBodyMsg"
+        chmod 666 "$cemTmpEMailBodyMsg"
+    else
+        echo "$2" > "$cemTmpEMailBodyMsg"
     fi
 
-    [ $# -gt 2 ] && [ -n "$3" ] && emailBodyTitle="$3"
+    shift ; shift
+    optionalARGs=""
+
+    for PARAM in "$@"
+    do
+        if ! _CheckValidParams_CEM_ "$PARAM"
+        then
+            logMsgStr="**ERROR**: INVALID argument [${PARAM}] was provided."
+            _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+            rm -f "$cemTmpEMailBodyMsg"
+            return 52
+        fi
+        if printf '%s\n' "$PARAM" | grep -qE '^-Title=.+'
+        then
+            emailBodyTitle="${PARAM##*=}"
+        elif printf '%s\n' "$PARAM" | grep -qE '^-Attach=.+'
+        then
+            emailAttachFPath="${PARAM##*=}"
+            if [ ! -s "$emailAttachFPath" ]
+            then
+                logMsgStr="**ERROR**: Email file attachment [$emailAttachFPath] NOT found."
+                _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+                rm -f "$cemTmpEMailBodyMsg"
+                return 53
+            fi
+            emailAttachFName="${emailAttachFPath##*/}"
+            if ! _GetEmailAttachmentType_CEM_ "$emailAttachFName"
+            then
+                rm -f "$cemTmpEMailBodyMsg"
+                return 54
+            fi
+            if ! _CheckMaxFileSize_CEM_ "$emailAttachFPath" 10MB
+            then
+                logMsgStr="**ERROR**: Email file attachment [$emailAttachFPath] exceeds maximum file size [10MB]."
+                _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+                rm -f "$cemTmpEMailBodyMsg"
+                return 55
+            fi
+            emailAttachmentOK=true
+        else
+            optionalARGs="${optionalARGs:+$optionalARGs }'$PARAM'"
+        fi
+        shift
+    done
+
+    [ -n "$optionalARGs" ] && eval set -- "$optionalARGs"
+    [ $# -gt 0 ] && [ -n "$1" ] && emailBodyTitle="$1"
+
+    if "$emailAttachmentOK"
+    then maxEmailBodySizeMB='5MB'
+    else maxEmailBodySizeMB='8MB'
+    fi
+    if ! _CheckMaxFileSize_CEM_ "$cemTmpEMailBodyMsg" "$maxEmailBodySizeMB"
+    then
+        logMsgStr="**ERROR**: Email message body exceeds maximum size [$maxEmailBodySizeMB]."
+        _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+        rm -f "$cemTmpEMailBodyMsg"
+        return 56
+    fi
 
     if "$cemIsFormatHTML"
     then
@@ -459,30 +601,31 @@ _CreateEMailContent_CEM_()
             emailBodyTitle="<h2>${emailBodyTitle}</h2>"
         fi
     else
-        emailBodyMsge="$(echo "$emailBodyMsge" | sed 's/[<]b[>]//g ; s/[<]\/b[>]//g')"
+        sed -i 's/[<]b[>]//g ; s/[<]\/b[>]//g' "$cemTmpEMailBodyMsg"
         emailBodyTitle="$(echo "$emailBodyTitle" | sed 's/[<]h[1-5][>]//g ; s/[<]\/h[1-5][>]//g')"
     fi
 
-    ## Header-1a ##
-    cat <<EOF > "$cemTmpEMailContent"
-From: "$FROM_NAME" <$FROM_ADDRESS>
-To: "$TO_NAME" <$TO_ADDRESS>
-EOF
+    ## Header ##
+    {
+       echo "From: \"${FROM_NAME}\" <$FROM_ADDRESS>"
+       echo "To: \"${TO_NAME}\" <$TO_ADDRESS>"
+       [ -n "$CC_ADDRESS_OK" ] && \
+       printf "Cc: \"${CC_NAME}\" <$CC_ADDRESS>\n"
+       echo "Subject: $emailSubject"
+       echo "Date: $(date -R)"
+       echo "MIME-Version: 1.0"
 
-    [ -n "$CC_ADDRESS_OK" ] && \
-    printf "Cc: \"$CC_NAME\" <$CC_ADDRESS>\n" >> "$cemTmpEMailContent"
+       if "$emailAttachmentOK"
+       then
+           echo "Content-Type: multipart/mixed; boundary=\"${emailMixedBoundary}\""
+           printf "\n--${emailMixedBoundary}\n"
+       fi
+    } > "$cemTmpEMailContent"
 
-    ## Header-1b ##
-    cat <<EOF >> "$cemTmpEMailContent"
-Subject: $1
-Date: $(date -R)
-EOF
-
-    ## Formatting ##
+    ## Body ##
     if "$cemIsFormatHTML"
     then
         cat <<EOF >> "$cemTmpEMailContent"
-MIME-Version: 1.0
 Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: 8bit
 Content-Disposition: inline
@@ -494,7 +637,6 @@ Content-Disposition: inline
 EOF
     else
         cat <<EOF >> "$cemTmpEMailContent"
-MIME-Version: 1.0
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 Content-Disposition: inline
@@ -504,8 +646,8 @@ EOF
         printf "%s\n" "$emailBodyTitle" >> "$cemTmpEMailContent"
     fi
 
-    ## Email Body Message ##
-    printf "%s\n" "$emailBodyMsge" >> "$cemTmpEMailContent"
+    ## Email Message Body ##
+    cat "$cemTmpEMailBodyMsg" >> "$cemTmpEMailContent"
 
     ## Footer ##
     if "$cemIsFormatHTML"
@@ -528,14 +670,35 @@ $(date +"$cemDateTimeFormat")
 EOF
     fi
 
+    if "$emailAttachmentOK"
+    then
+       {
+          echo
+          echo "--$emailMixedBoundary"
+          echo "Content-Type: ${emailAttachFType}; name=\"$emailAttachFName\""
+          echo "Content-Transfer-Encoding: base64"
+          echo "Content-Disposition: attachment; filename=\"$emailAttachFName\""
+          echo
+          openssl base64 -A < "$emailAttachFPath"
+          echo
+          echo "--$emailMixedBoundary--"
+       } >> "$cemTmpEMailContent" 
+    fi
+
+    rm -f "$cemTmpEMailBodyMsg"
+    if [ -n "$emailBodyFile" ] && \
+       echo "$emailBodyFile" | grep -qE '^/tmp/.+'
+    then rm -f "$emailBodyFile"
+    fi
     return 0
 }
 
 #-------------------------------------------------------#
 # ARG1: Email Subject string.
 # ARG2: Email Body message string or the full path of
-#       a file containing the Email Body message.
+#       the file containing the email message body.
 # ARG3: Email Body Title string [OPTIONAL].
+# ARG4: Full path of email file attachment [OPTIONAL].
 #-------------------------------------------------------#
 _SendEMailNotification_CEM_()
 {
@@ -543,7 +706,7 @@ _SendEMailNotification_CEM_()
       ! _CheckEMailConfigFileFromAMTM_CEM_
    then return 1 ; fi
 
-   local CC_ADDRESS_OK=""
+   local retCode  CC_ADDRESS_OK=""
    local theMsgStr  logMsgStr  logPrioNum  mailpswd
    local curlRetCode  statusCODE  statusSTRx  httpStatusSTR
 
@@ -554,7 +717,8 @@ _SendEMailNotification_CEM_()
    then CC_ADDRESS_OK=TRUE
    fi
 
-   ! _CreateEMailContent_CEM_ "$@" && return 1
+   _CreateEMailContent_CEM_ "$@"
+   retCode="$?" ; [ "$retCode" -ne 0 ] && return "$retCode"
 
    if "$cemIsVerboseMode"
    then
@@ -566,7 +730,7 @@ _SendEMailNotification_CEM_()
    if [ -z "$mailpswd" ]
    then
        _LogMsg_CEM_ "**ERROR**: Failure to extract email password." "$cemSysLogERROR"
-       return 1
+       return 60
    fi
 
    printf '' > "$cemCurlErrLogFPath"
@@ -579,8 +743,7 @@ _SendEMailNotification_CEM_()
    --url "${PROTOCOL}://${SMTP}:${PORT}" \
    --user "${USERNAME}:$mailpswd" \
    --mail-from "$FROM_ADDRESS" \
-   --mail-rcpt "$TO_ADDRESS" \
-   ${CC_ADDRESS_OK:+--mail-rcpt "$CC_ADDRESS"} \
+   --mail-rcpt "$TO_ADDRESS" ${CC_ADDRESS_OK:+--mail-rcpt "$CC_ADDRESS"} \
    --upload-file "$cemTmpEMailContent" \
    $SSL_FLAG --ssl-reqd --crlf >> "$cemCurlTmpLogFPath"
    curlRetCode="$?"
@@ -613,13 +776,13 @@ _SendEMailNotification_CEM_()
        fi
    fi
    mailpswd='XXXXXXXXXXXXXXX' ; unset mailpswd
-   sleep 2
 
    if "$cemIsVerboseMode" || [ "$logPrioNum" = "$cemSysLogERROR" ]
    then _PrintMsg_CEM_ "$theMsgStr"
    fi
    _LogMsg_CEM_ "$logMsgStr" "$logPrioNum" NOECHO
 
+   sleep 1
    if "$cemDeleteMailContentFile"
    then rm -f "$cemTmpEMailContent"
    else mv -f "$cemTmpEMailContent" "${cemTmpEMailContent}.DEBUG"
