@@ -13,15 +13,15 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Jun-14 [Martinski W.]
-# Last Modified: 2026-Oct-15 [Martinski W.]
+# Last Modified: 2026-Oct-18 [Martinski W.]
 #####################################################################
 set -u
 
-readonly SCRIPT_VERSION="v1.1.1"
-readonly SCRIPT_VERSTAG="26101522"
+readonly SCRIPT_VERSION="v1.1.2"
+readonly SCRIPT_VERSTAG="26101823"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
-SCRIPT_BRANCH="develop"
+SCRIPT_BRANCH="master"
 
 # Give FIRST priority to built-in binaries over any other #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -263,6 +263,12 @@ To send email notifications [the order of the arguments is important]:
   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" ${MGNTct}-Body=${CLRct}"${TMP_DIR}/theEmailBody.txt"
 
   ${GRNct}$SCRIPT_TNAME ${MGNTct}-From=${CLRct}"SenderID" "Subject Line" ${MGNTct}-Body=${CLRct}"${TMP_DIR}/theEmailBody.txt" ${MGNTct}-Title=${CLRct}"Email Body Title Line"
+
+
+  ${YLWct}NOTE:${CLRct}
+  ${YLWct}-----${CLRct}
+  If the body of the email is set to be in a file located under the '${CYANct}/tmp/${CLRct}' directory,
+  the file will be automatically deleted ${BOLDct}*after*${CLRct} the email has been successfully sent.
 
 
 Optional command-line argument to add an email file attachment:
@@ -1097,9 +1103,8 @@ _IsOptionalEmailArg_()
 #-----------------------------------------------------------#
 _CheckValidParams_()
 {
-   if { ! printf '%s\n' "$1" | grep -qE '^[-].+' && \
-        ! printf '%s\n' "$1" | grep -qE "^($emailOptionalArgs)=.+" ; } || \
-      _IsOptionalEmailArg_ "$1" || \
+   if _IsOptionalEmailArg_ "$1" || \
+      ! printf '%s\n' "$1" | grep -qE "^($emailOptionalArgs)=.+" || \
       printf '%s\n' "$1" | grep -qE '^-(test|install|uninstall|checkupdate|forceupdate|stable|develop|showconf|version|getvers|html|ptext|quiet|silent|verbose)$'
    then return 0
    else return 1
@@ -1403,7 +1408,7 @@ _SetSecondaryEmailAddress_()
 
    userInput=""
    minCharLen=10
-   maxCharLen=64
+   maxCharLen=100
    doReturnToMenu=false
    doClearSetting=false
 
@@ -1819,6 +1824,8 @@ do
              emailCCEmail="${PARAM##*=}"
              [ "$emailCCEmail" = 'TBD' ] && emailCCEmail=''
          else
+             # Allow single quotes in "Subject" string #
+             PARAM="$(echo "$PARAM" | sed "s/'/'\\\\''/g")"
              theListOfARGs="${theListOfARGs:+$theListOfARGs }'$PARAM'"
          fi
          shift
