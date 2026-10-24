@@ -3,12 +3,17 @@
 # FILENAME: CustomEMailFunctions.lib.sh
 # TAG: _LIB_CustomEMailFunctions_SHELL_
 #
-# Custom miscellaneous definitions and functions to send
-# email notifications using AMTM email configuration file.
+# Custom definitions and functions to send email notifications.
+# Reads AMTM email configuration file for user-defined settings.
+#
+# IMPORTANT NOTE:
+# Variable names with the "cem" or "CEM" prefix are reserved for
+# the shared Custom Email Library. Do NOT modify values unless
+# you know their purpose. Do *NOT* change the variable names.
 #---------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Oct-03 [Martinski W.]
+# Last Modified: 2026-Oct-23 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -16,8 +21,8 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="v1.1.0"
-CEM_LIB_VERSTAG="26100308"
+CEM_LIB_VERSION="v1.1.1"
+CEM_LIB_VERSTAG="26102323"
 
 CEM_LIB_REPO_BRANCH="master"
 CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
@@ -49,7 +54,7 @@ cemScriptFileName="${0##*/}"
 cemScriptFNameTag="${cemScriptFileName%.*}"
 cemPID="$(printf "%05d" "$$")"
 
-# The shared Custom Email Library Script #
+# The shared Custom Email Library script #
 cemAddOnsSharedLibsDirPath="${CEM_ADDONS_DIR}/shared-libs"
 cemCustomEmailLibScriptFName="CustomEMailFunctions.lib.sh"
 cemCustomEmailLibScriptFPath="${cemAddOnsSharedLibsDirPath}/$cemCustomEmailLibScriptFName"
@@ -61,12 +66,12 @@ cemTmpEMailContent="${CEM_TEMP_DIR}/tmpEMailBodyCont_${cemScriptFNameTag}_${cemP
 cemTmpEMailBodyMsg="${CEM_TEMP_DIR}/tmpEMailBodyMsge_${cemScriptFNameTag}_${cemPID}.MSG"
 cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
 
-cemNvramInitUSleep=10
+cemNvramInitUSleep=20
 cemNvramWaitUSleep=50
-cemNvramWaitFactor=20000
-cemNvramWaitSecMAX=2
-cemNvramWaitCntMAX="$((cemNvramWaitSecMAX * cemNvramWaitFactor))"
-cemNvramValTmpFPath="${CEM_TEMP_DIR}/cemNvramValue_${cemScriptFNameTag}_${cemPID}.TMP.TXT"
+cemNvramWaitCntMAX=5000
+cemNvramCentiSecsN=250
+cemNvramCmdTriesMAX=3
+cemNvramGetTmpFPath="${CEM_TEMP_DIR}/cemNvramGET_${cemScriptFNameTag}_${cemPID}.TMP.GET"
 
 cemSysLogALERT=1
 cemSysLogCRITC=2
@@ -269,7 +274,7 @@ _CheckLibraryUpdates_CEM_()
    fi
 
    "$showAllMsgs" && \
-   _PrintMsg_CEM_ "\nChecking for shared email library script updates...\n"
+   _PrintMsg_CEM_ "\nChecking for Custom Email Library script updates...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
    for theScriptURL in "$CEM_LIB_SCRIPT_GH_URL1" "$CEM_LIB_SCRIPT_GH_URL2"
@@ -309,7 +314,7 @@ _CheckLibraryUpdates_CEM_()
        if "$showAllMsgs"
        then
            theVerStr="$(_FormatVersionStr_CEM_ "$CEM_LIB_VERSION" "$CEM_LIB_VERSTAG")"
-           _PrintMsg_CEM_ "You have the latest email library script version $theVerStr installed.\n\n"
+           _PrintMsg_CEM_ "You have the latest Custom Email Library script version $theVerStr installed.\n\n"
        fi
    else
        retCode=0
@@ -317,7 +322,7 @@ _CheckLibraryUpdates_CEM_()
        if "$showAllMsgs"
        then
            theVerStr="$(_FormatVersionStr_CEM_ "$dlVersionStr" "$dlVersTagStr")"
-           _PrintMsg_CEM_ "New shared email library script version $theVerStr is available.\n\n"
+           _PrintMsg_CEM_ "New Custom Email Library script version $theVerStr is available.\n\n"
        fi
    fi
 
@@ -326,15 +331,25 @@ _CheckLibraryUpdates_CEM_()
 }
 
 #-----------------------------------------------------------#
-_NVRAM_Get_CEM_()
+_GetUpTimeCSecs_CEM_()
+{ awk -F' ' '{ printf "%d\n", int($1*100)}' /proc/uptime ; }
+
+#-----------------------------------------------------------#
+_nvramGet_CEM_()
 {
    local nvramProcID  nvramProcOK=false  retCode=1
-   local waitCountNUM=0  logMsgStr  nvramKeyValue=""
+   local waitCountNUM=0  logMsgStr
+   local startCSecs  nowCSecs  maxCSecs  diffCSecs=0
 
-   printf '' > "$cemNvramValTmpFPath"
-   nvram get "$1" > "$cemNvramValTmpFPath" &
+   nvramKeyValue=""
+   printf '' > "$cemNvramGetTmpFPath"
+   nvram get "$1" > "$cemNvramGetTmpFPath" &
    nvramProcID="$!"
    usleep "$cemNvramInitUSleep"
+
+   startCSecs="$(_GetUpTimeCSecs_CEM_)"
+   nowCSecs="$startCSecs"
+   maxCSecs="$((startCSecs + cemNvramCentiSecsN))"
 
    while true
    do
@@ -342,36 +357,70 @@ _NVRAM_Get_CEM_()
        then nvramProcOK=true ; break
        fi
        usleep "$cemNvramWaitUSleep"
+       nowCSecs="$(_GetUpTimeCSecs_CEM_)"
        waitCountNUM="$((waitCountNUM + 1))"
-       if [ "$waitCountNUM" -ge "$cemNvramWaitCntMAX" ]
+       if [ "$nowCSecs" -gt "$maxCSecs" ] || \
+          [ "$waitCountNUM" -ge "$cemNvramWaitCntMAX" ]
        then break
        fi
    done
 
    if kill -EXIT "$nvramProcID" 2>/dev/null
    then
-       retCode=555
-       nvramProcOK=false
+       retCode=127 ; nvramProcOK=false
        kill -KILL "$nvramProcID" 2>/dev/null ; wait "$nvramProcID"
-       logMsgStr="**ALERT**: Wait timeout [$cemNvramWaitSecMAX secs] for 'nvram get $1' command expired."
+       if [ "$nowCSecs" -gt "$startCSecs" ]
+       then diffCSecs="$((nowCSecs - startCSecs))"
+       fi
+       logMsgStr="**ALERT**: Wait timeout [Count=$waitCountNUM, CSecs=$diffCSecs] for 'nvram GET $1' command was reached."
        _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR" NOECHO
    fi
-   if "$nvramProcOK" && [ -s "$cemNvramValTmpFPath" ]
+   if "$nvramProcOK"
    then
-       nvramKeyValue="$(cat "$cemNvramValTmpFPath")"
        retCode=0
+       [ -s "$cemNvramGetTmpFPath" ] && \
+       nvramKeyValue="$(cat "$cemNvramGetTmpFPath")"
    fi
 
-   rm -f "$cemNvramValTmpFPath"
-   echo "$nvramKeyValue"
+   rm -f "$cemNvramGetTmpFPath"
    return "$retCode"
+}
+
+#-----------------------------------------------------------#
+_NVRAM_Get_CEM_()
+{
+    local retCode  cmdNumTries=0  logMsgStr
+    local nvramKeyValue=""  nvramCmdOK=false
+
+    while true
+    do
+        _nvramGet_CEM_ "$1"
+        retCode="$?"
+        if [ "$retCode" -eq 0 ]
+        then nvramCmdOK=true ; break
+        fi
+        if [ "$((++cmdNumTries))" -ge "$cemNvramCmdTriesMAX" ] 
+        then break
+        fi
+        sleep 1
+    done
+
+    if "$nvramCmdOK"
+    then
+        echo "$nvramKeyValue"
+    else
+        echo
+        logMsgStr="**ERROR**: Maximum number of tries [Count=$cmdNumTries] for 'nvram GET $1' command was reached."
+        _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+    fi
+    return "$retCode"
 }
 
 #-----------------------------------------------------------#
 _GetRouterModelID_CEM_()
 {
    local retCode=1  nvramKeyName  nvramKeyValue=""
-   local nvramModelKeys="odmpid wps_modelnum model build_name"
+   local nvramModelKeys="odmpid  wps_modelnum  model  build_name"
    for nvramKeyName in $nvramModelKeys
    do
        nvramKeyValue="$(_NVRAM_Get_CEM_ "$nvramKeyName")"
