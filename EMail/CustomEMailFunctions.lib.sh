@@ -13,7 +13,7 @@
 #---------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Oct-23 [Martinski W.]
+# Last Modified: 2026-Oct-25 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -22,7 +22,7 @@ else return 0
 fi
 
 CEM_LIB_VERSION="v1.1.1"
-CEM_LIB_VERSTAG="26102323"
+CEM_LIB_VERSTAG="26102523"
 
 CEM_LIB_REPO_BRANCH="master"
 CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
@@ -68,7 +68,7 @@ cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
 
 cemNvramInitUSleep=20
 cemNvramWaitUSleep=50
-cemNvramWaitCntMAX=5000
+cemNvramWaitCntMAX=1000
 cemNvramCentiSecsN=250
 cemNvramCmdTriesMAX=3
 cemNvramGetTmpFPath="${CEM_TEMP_DIR}/cemNvramGET_${cemScriptFNameTag}_${cemPID}.TMP.GET"
@@ -331,8 +331,8 @@ _CheckLibraryUpdates_CEM_()
 }
 
 #-----------------------------------------------------------#
-_GetUpTimeCSecs_CEM_()
-{ awk -F' ' '{ printf "%d\n", int($1*100)}' /proc/uptime ; }
+_GetUptimeCSecs_CEM_()
+{ awk -F' ' '{print int($1 * 100)}' /proc/uptime ; }
 
 #-----------------------------------------------------------#
 _nvramGet_CEM_()
@@ -347,7 +347,7 @@ _nvramGet_CEM_()
    nvramProcID="$!"
    usleep "$cemNvramInitUSleep"
 
-   startCSecs="$(_GetUpTimeCSecs_CEM_)"
+   startCSecs="$(_GetUptimeCSecs_CEM_)"
    nowCSecs="$startCSecs"
    maxCSecs="$((startCSecs + cemNvramCentiSecsN))"
 
@@ -357,7 +357,7 @@ _nvramGet_CEM_()
        then nvramProcOK=true ; break
        fi
        usleep "$cemNvramWaitUSleep"
-       nowCSecs="$(_GetUpTimeCSecs_CEM_)"
+       nowCSecs="$(_GetUptimeCSecs_CEM_)"
        waitCountNUM="$((waitCountNUM + 1))"
        if [ "$nowCSecs" -gt "$maxCSecs" ] || \
           [ "$waitCountNUM" -ge "$cemNvramWaitCntMAX" ]

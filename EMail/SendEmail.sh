@@ -13,12 +13,12 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Jun-14 [Martinski W.]
-# Last Modified: 2026-Oct-23 [Martinski W.]
+# Last Modified: 2026-Oct-25 [Martinski W.]
 #####################################################################
 set -u
 
 readonly SCRIPT_VERSION="v1.1.3"
-readonly SCRIPT_VERSTAG="26102323"
+readonly SCRIPT_VERSTAG="26102523"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 SCRIPT_BRANCH="master"
