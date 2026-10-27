@@ -3,22 +3,22 @@
 # SendEmail.sh
 #
 # CLI script tool to send simple email notifications using
-# the existing shared custom email library script:
+# the shared Custom Email Library script:
 # "/jffs/addons/shared-libs/CustomEMailFunctions.lib.sh"
 #
 # IMPORTANT NOTE:
-# Variables with the "cem" or "CEM" prefix are reserved for
-# the shared custom email library. You can modify the values
-# but do *NOT* change the variable names.
+# Variable names with the "cem" or "CEM" prefix are reserved for
+# the shared Custom Email Library. Do NOT modify values unless
+# you know their purpose. Do *NOT* change the variable names.
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Jun-14 [Martinski W.]
-# Last Modified: 2026-Oct-18 [Martinski W.]
+# Last Modified: 2026-Oct-25 [Martinski W.]
 #####################################################################
 set -u
 
-readonly SCRIPT_VERSION="v1.1.2"
-readonly SCRIPT_VERSTAG="26101823"
+readonly SCRIPT_VERSION="v1.1.3"
+readonly SCRIPT_VERSTAG="26102523"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 SCRIPT_BRANCH="master"
@@ -54,7 +54,7 @@ readonly REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW"
 readonly REPO_URL_BASE1="https://raw.githubusercontent.com/Martinski4GitHub"
 
 readonly EMAIL_LIB_BRANCH='master'
-readonly EMAIL_LIB_MINVER='v1.1.0'
+readonly EMAIL_LIB_MINVER='v1.1.1'
 readonly EMAIL_LIB_URL_BASE1="${REPO_URL_BASE1}/CustomMiscUtils"
 readonly EMAIL_LIB_URL_BASE2="${REPO_URL_BASE2}/CustomMiscUtils"
 readonly EMAIL_LIB_REPO_URL1="${EMAIL_LIB_URL_BASE1}/${EMAIL_LIB_BRANCH}/EMail"
@@ -862,7 +862,7 @@ _DownloadCustomEmailLibraryScript_()
    if [ $# -eq 0 ] || [ -z "$1" ] || \
       ! echo "$1" | grep -qE '^-(update|install|force)$'
    then
-       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: NO valid parameter was provided to download library file.\n"
+       _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: NO valid parameter was provided to download library script.\n"
        return 1
    fi
 
@@ -895,7 +895,7 @@ _DownloadCustomEmailLibraryScript_()
    esac
 
    [ "$updateType" = "check" ] && "$isVerboseMode" && \
-   _PrintMsg_ "\n${actionStr1} the shared email library script to support email notifications...\n"
+   _PrintMsg_ "\n${actionStr1} the shared Custom Email Library to support email notifications...\n"
 
    retCode=1 ; urlDLCount=0 ; urlDLMax=2
    for theScriptURL in "$EMAIL_LIB_REPO_URL1" "$EMAIL_LIB_REPO_URL2"
@@ -911,7 +911,7 @@ _DownloadCustomEmailLibraryScript_()
            then
                [ "$urlDLCount" -gt 1 ] && echo
                theVerStr="${GRNct}${CEM_LIB_VERSION}${CLRct} [${GRNct}${CEM_LIB_VERSTAG}${CLRct}]"
-               _PrintMsg_ "The shared email library script ${GRNct}${CUSTOM_EMAIL_LIB_SCRIPT_FNAME}${CLRct} was ${actionStr2} ${theVerStr}.\n"
+               _PrintMsg_ "The shared Custom Email Library ${GRNct}${CUSTOM_EMAIL_LIB_SCRIPT_FNAME}${CLRct} was ${actionStr2} ${theVerStr}.\n"
            fi
            retCode=0
            break
@@ -920,7 +920,7 @@ _DownloadCustomEmailLibraryScript_()
 
    if [ "$retCode" -ne 0 ]
    then
-       _PrintMsg_ "The shared email library script ${REDct}${CUSTOM_EMAIL_LIB_SCRIPT_FNAME}${CLRct} was NOT ${actionStr2}.\n"
+       _PrintMsg_ "The shared Custom Email Library ${REDct}${CUSTOM_EMAIL_LIB_SCRIPT_FNAME}${CLRct} was NOT ${actionStr2}.\n"
    fi
    return "$retCode"
 }
@@ -1120,7 +1120,7 @@ _Send_EMail_Msg_()
 {
    if [ -z "${amtmIsEMailConfigFileEnabled:+xSETx}" ]
    then
-       logMsgStr="Shared email library script [$CUSTOM_EMAIL_LIB_SCRIPT_FNAME] is *NOT* loaded."
+       logMsgStr="Shared Custom Email Library [$CUSTOM_EMAIL_LIB_SCRIPT_FNAME] is *NOT* loaded."
        _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: ${MGNTct}${logMsgStr}${CLRct}\n\n"
        _LogMsg_ "$logMsgStr" "$pLogERROR" NOECHO
        return 1
