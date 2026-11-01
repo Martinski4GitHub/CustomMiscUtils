@@ -76,7 +76,7 @@ readonly emailUpdateMutexFLock_FD=783
 readonly emailUpdateMutexFLock_FN="${TEMP_DIR}/CEMailUpdateCheck.FLOCK"
 emailUpdateMutexFLock_OK=false  #To check if/when we own the Lock#
 
-readonly emailOptionalArgs="From|Title|Body|Attach|CCName|CCEmail"
+readonly emailOptionalArgs="From|Title|Body|BodyHTML|Attach|CCName|CCEmail"
 
 readonly CLRct="\e[0m"
 readonly BOLDct="\e[1m"
