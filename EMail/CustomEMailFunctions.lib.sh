@@ -13,7 +13,7 @@
 #---------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2020-Jun-11 [Martinski W.]
-# Last Modified: 2026-Oct-25 [Martinski W.]
+# Last Modified: 2026-Nov-01 [Martinski W.]
 ######################################################################
 
 if [ -z "${_LIB_CustomEMailFunctions_SHELL_:+xSETx}" ]
@@ -21,10 +21,10 @@ then _LIB_CustomEMailFunctions_SHELL_=0
 else return 0
 fi
 
-CEM_LIB_VERSION="v1.1.1"
-CEM_LIB_VERSTAG="26102523"
+CEM_LIB_VERSION="v1.1.2"
+CEM_LIB_VERSTAG="26110100"
 
-CEM_LIB_REPO_BRANCH="master"
+CEM_LIB_REPO_BRANCH="develop"
 CEM_LIB_REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW/CustomMiscUtils"
 CEM_LIB_REPO_URL_BASE1="https://raw.githubusercontent.com/Martinski4GitHub/CustomMiscUtils"
 CEM_LIB_SCRIPT_GH_URL1="${CEM_LIB_REPO_URL_BASE1}/${CEM_LIB_REPO_BRANCH}/EMail"
@@ -65,11 +65,12 @@ cemCurlErrLogFPath="${CEM_TEMP_DIR}/tmpEMailCurl_${cemScriptFNameTag}_${cemPID}.
 cemTmpEMailContent="${CEM_TEMP_DIR}/tmpEMailBodyCont_${cemScriptFNameTag}_${cemPID}.TXT"
 cemTmpEMailBodyMsg="${CEM_TEMP_DIR}/tmpEMailBodyMsge_${cemScriptFNameTag}_${cemPID}.MSG"
 cemDateTimeFormat="%Y-%b-%d %a %I:%M:%S %p %Z"
+cemEmailPrefixARGs="F|File|Body|BodyHTML|Title|Attach"
 
-cemNvramInitUSleep=20
-cemNvramWaitUSleep=50
-cemNvramWaitCntMAX=1000
-cemNvramCentiSecsN=250
+cemNvramInitUSleep=10
+cemNvramWaitUSleep=40
+cemNvramWaitCntMAX=400
+cemNvramCentiSecsN=200
 cemNvramCmdTriesMAX=3
 cemNvramGetTmpFPath="${CEM_TEMP_DIR}/cemNvramGET_${cemScriptFNameTag}_${cemPID}.TMP.GET"
 
@@ -372,8 +373,8 @@ _nvramGet_CEM_()
        if [ "$nowCSecs" -gt "$startCSecs" ]
        then diffCSecs="$((nowCSecs - startCSecs))"
        fi
-       logMsgStr="**ALERT**: Wait timeout [Count=$waitCountNUM, CSecs=$diffCSecs] for 'nvram GET $1' command was reached."
-       _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR" NOECHO
+       logMsgStr="**ALERT**: Wait timeout [TryCount=$cmdNumTries, WaitCount=$waitCountNUM, CSecs=$diffCSecs] for 'nvram GET $1' command was reached."
+       _LogMsg_CEM_ "$logMsgStr" "$cemSysLogWARNG" NOECHO
    fi
    if "$nvramProcOK"
    then
@@ -389,7 +390,7 @@ _nvramGet_CEM_()
 #-----------------------------------------------------------#
 _NVRAM_Get_CEM_()
 {
-    local retCode  cmdNumTries=0  logMsgStr
+    local retCode  cmdNumTries=1  logMsgStr
     local nvramKeyValue=""  nvramCmdOK=false
 
     while true
@@ -399,10 +400,11 @@ _NVRAM_Get_CEM_()
         if [ "$retCode" -eq 0 ]
         then nvramCmdOK=true ; break
         fi
-        if [ "$((++cmdNumTries))" -ge "$cemNvramCmdTriesMAX" ] 
+        if [ "$cmdNumTries" -ge "$cemNvramCmdTriesMAX" ]
         then break
         fi
         sleep 1
+        cmdNumTries="$((cmdNumTries + 1))"
     done
 
     if "$nvramCmdOK"
@@ -411,7 +413,7 @@ _NVRAM_Get_CEM_()
     else
         echo
         logMsgStr="**ERROR**: Maximum number of tries [Count=$cmdNumTries] for 'nvram GET $1' command was reached."
-        _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
+        _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR" NOECHO
     fi
     return "$retCode"
 }
@@ -479,9 +481,8 @@ _CheckEMailConfigFileFromAMTM_CEM_()
 #-----------------------------------------------------------#
 _CheckValidParams_CEM_()
 {
-   if { ! printf '%s\n' "$1" | grep -qE '^[-].+' && \
-        ! printf '%s\n' "$1" | grep -qE '^(File|Title|Attach)=.+' ; } || \
-      printf '%s\n' "$1" | grep -qE '^-(File|Title|Attach)=.+'
+   if printf '%s\n' "$1" | grep -qE "^-($cemEmailPrefixARGs)=.+" || \
+      ! printf '%s\n' "$1" | grep -qE "^($cemEmailPrefixARGs)=.+"
    then return 0
    else return 1
    fi
@@ -561,26 +562,39 @@ _CreateEMailContent_CEM_()
     if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
     then return 50
     fi
-    local emailSubject="$1"  optionalARGs
-    local emailBodyFile  emailBodyTitle=""
+    local emailSubjectBase64  emailBodyTitle=""
+    local emailBodyFile  isEmailBodyInlineHTML=false
     local emailAttachFPath=""  emailAttachFName=""
     local emailAttachFType=""  emailAttachmentOK=false
     local emailMixedBoundary='MULTIPART-MIXED-BOUNDARY'
+    local optionalARGs  maxEmailBodySizeMB
 
-    if printf '%s\n' "$2" | grep -qE '^-(F|File)=.+'
+    emailSubjectBase64="$(printf '%s' "$1" | openssl base64 -A)"
+
+    if printf '%s\n' "$2" | grep -qE '^-(F|File|Body)=.+'
     then
-        emailBodyFile="${2##*=}"
+        emailBodyFile="${2#*=}"
+        isEmailBodyInlineHTML=false
+    elif printf '%s\n' "$2" | grep -qE '^-BodyHTML=.+'
+    then
+        emailBodyFile="${2#*=}"
+        isEmailBodyInlineHTML=true
+    else
+        emailBodyFile=""
+        echo "$2" > "$cemTmpEMailBodyMsg"
+    fi
+
+    if [ -n "$emailBodyFile" ]
+    then
         if [ ! -s "$emailBodyFile" ]
         then
             logMsgStr="**ERROR**: Email body file [$emailBodyFile] NOT found."
             _LogMsg_CEM_ "$logMsgStr" "$cemSysLogERROR"
             return 51
         fi
-        cp -fp "$emailBodyFile" "$cemTmpEMailBodyMsg"
-        chmod 666 "$cemTmpEMailBodyMsg"
-    else
-        echo "$2" > "$cemTmpEMailBodyMsg"
+        cp -fp "$emailBodyFile" "$cemTmpEMailBodyMsg" 
     fi
+    chmod 666 "$cemTmpEMailBodyMsg"
 
     shift ; shift
     optionalARGs=""
@@ -596,10 +610,10 @@ _CreateEMailContent_CEM_()
         fi
         if printf '%s\n' "$PARAM" | grep -qE '^-Title=.+'
         then
-            emailBodyTitle="${PARAM##*=}"
+            emailBodyTitle="${PARAM#*=}"
         elif printf '%s\n' "$PARAM" | grep -qE '^-Attach=.+'
         then
-            emailAttachFPath="${PARAM##*=}"
+            emailAttachFPath="${PARAM#*=}"
             if [ ! -s "$emailAttachFPath" ]
             then
                 logMsgStr="**ERROR**: Email file attachment [$emailAttachFPath] NOT found."
@@ -660,7 +674,7 @@ _CreateEMailContent_CEM_()
        echo "To: \"${TO_NAME}\" <$TO_ADDRESS>"
        [ -n "$CC_ADDRESS_OK" ] && \
        printf "Cc: \"${CC_NAME}\" <$CC_ADDRESS>\n"
-       echo "Subject: $emailSubject"
+       echo "Subject: =?UTF-8?B?${emailSubjectBase64}?="
        echo "Date: $(date -R)"
        echo "MIME-Version: 1.0"
 
@@ -671,7 +685,7 @@ _CreateEMailContent_CEM_()
        fi
     } > "$cemTmpEMailContent"
 
-    ## Body ##
+    ## Body Prologue ##
     if "$cemIsFormatHTML"
     then
         cat <<EOF >> "$cemTmpEMailContent"
@@ -682,9 +696,18 @@ Content-Disposition: inline
 <!DOCTYPE html><html>
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head>
 <body>$emailBodyTitle
-<div style="color:black; font-family: sans-serif; font-size:130%;"><pre>
+
 EOF
+        if ! "$isEmailBodyInlineHTML"
+        then
+            cat <<EOF >> "$cemTmpEMailContent"
+<div style="color:black; font-family: sans-serif; font-size:130%;">
+<pre style="white-space: pre-wrap; white-space: -moz-pre-wrap; white-space: -pre-wrap; white-space: -o-pre-wrap; word-wrap: break-word; word-break: break-word;">
+
+EOF
+        fi
     else
+        #Plain Text#
         cat <<EOF >> "$cemTmpEMailContent"
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
@@ -701,6 +724,12 @@ EOF
     ## Footer ##
     if "$cemIsFormatHTML"
     then
+        if "$isEmailBodyInlineHTML"
+        then
+            cat <<EOF >> "$cemTmpEMailContent"
+<div style="color:black; font-family: sans-serif; font-size:120%;"><pre>
+EOF
+        fi
         cat <<EOF >> "$cemTmpEMailContent"
 
 Sent by the "<b>${cemScriptFileName}</b>" script.
@@ -710,6 +739,7 @@ $(date +"$cemDateTimeFormat")
 </pre></div></body></html>
 EOF
     else
+        #Plain Text#
         cat <<EOF >> "$cemTmpEMailContent"
 
 Sent by the "${cemScriptFileName}" script.

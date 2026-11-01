@@ -2,8 +2,8 @@
 A collection of custom shell scripts that can be used for specific tasks.
 
 ## Custom Email Library Script
-## v1.1.1
-### Updated on 2026-Oct-26
+## v1.1.2
+### Updated on 2026-Nov-01
 
 The shared Custom Email Library script can be used on ASUS routers running **Asuswrt-Merlin** firmware:
 

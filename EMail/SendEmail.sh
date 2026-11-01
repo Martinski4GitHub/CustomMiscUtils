@@ -13,12 +13,12 @@
 #-------------------------------------------------------------------
 # Original Author: Martinski W.
 # Creation Date: 2026-Jun-14 [Martinski W.]
-# Last Modified: 2026-Oct-25 [Martinski W.]
+# Last Modified: 2026-Nov-01 [Martinski W.]
 #####################################################################
 set -u
 
-readonly SCRIPT_VERSION="v1.1.3"
-readonly SCRIPT_VERSTAG="26102523"
+readonly SCRIPT_VERSION="v1.1.4"
+readonly SCRIPT_VERSTAG="26110100"
 readonly SCRIPT_TNAME="SendEmail"
 readonly SCRIPT_FNAME="${SCRIPT_TNAME}.sh"
 SCRIPT_BRANCH="develop"
@@ -53,8 +53,8 @@ readonly theScriptSLink="${JFFS_SCRIPTS_DIR}/$SCRIPT_TNAME"
 readonly REPO_URL_BASE2="https://raw.githubusercontent.com/MartinSkyW"
 readonly REPO_URL_BASE1="https://raw.githubusercontent.com/Martinski4GitHub"
 
-readonly EMAIL_LIB_BRANCH='master'
-readonly EMAIL_LIB_MINVER='v1.1.1'
+readonly EMAIL_LIB_BRANCH='develop'
+readonly EMAIL_LIB_MINVER='v1.1.2'
 readonly EMAIL_LIB_URL_BASE1="${REPO_URL_BASE1}/CustomMiscUtils"
 readonly EMAIL_LIB_URL_BASE2="${REPO_URL_BASE2}/CustomMiscUtils"
 readonly EMAIL_LIB_REPO_URL1="${EMAIL_LIB_URL_BASE1}/${EMAIL_LIB_BRANCH}/EMail"
@@ -1125,7 +1125,8 @@ _Send_EMail_Msg_()
        _LogMsg_ "$logMsgStr" "$pLogERROR" NOECHO
        return 1
    fi
-   local retCode  showErrorMsgs=false  emailBodyFile=""
+   local retCode  showErrorMsgs=false
+   local emailBodyFile  emailBodyARG='-File'
    local emailBodySendFPath="${emailBodyCFPath}.SEND"
 
    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
@@ -1134,20 +1135,30 @@ _Send_EMail_Msg_()
        return 1
    fi
 
-   if echo "$2" | grep -qE '^-Body=.+'
+   if printf '%s\n' "$2" | grep -qE '^-Body=.+'
    then
-       emailBodyFile="${2##*=}"
+       emailBodyFile="${2#*=}"
+       emailBodyARG='-Body'
+   elif printf '%s\n' "$2" | grep -qE '^-BodyHTML=.+'
+   then
+       emailBodyFile="${2#*=}"
+       emailBodyARG='-BodyHTML'
+   elif ! _IsOptionalEmailArg_ "$2"
+   then
+       emailBodyFile=""
+       echo "$2" > "$emailBodySendFPath"
+   fi
+
+   if [ -n "$emailBodyFile" ]
+   then
        if [ ! -s "$emailBodyFile" ]
        then
            _PrintMsg_ "\n${REDct}**ERROR**${CLRct}: Email body file [${REDct}${emailBodyFile}${CLRct}] NOT found.\n"
            return 1
        fi
        cp -fp "$emailBodyFile" "$emailBodySendFPath"
-       chmod 666 "$emailBodySendFPath"
-   elif ! _IsOptionalEmailArg_ "$2"
-   then
-       echo "$2" > "$emailBodySendFPath"
    fi
+   chmod 666 "$emailBodySendFPath"
 
    if [ ! -s "$emailBodySendFPath" ]
    then
@@ -1173,7 +1184,7 @@ _Send_EMail_Msg_()
    then FROM_NAME="$emailSenderID"
    fi
 
-   _SendEMailNotification_CEM_ "$1" -File="$emailBodySendFPath" ${emailBodyTitle:+-Title="$emailBodyTitle"} ${emailAttachFile:+-Attach="$emailAttachFile"}
+   _SendEMailNotification_CEM_ "$1" ${emailBodyARG}="$emailBodySendFPath" ${emailBodyTitle:+-Title="$emailBodyTitle"} ${emailAttachFile:+-Attach="$emailAttachFile"}
    retCode="$?"
 
    if [ "$retCode" -eq 0 ]
@@ -1808,20 +1819,20 @@ do
          fi
          if echo "$PARAM" | grep -qE '^-From=.+'
          then
-             emailSenderID="${PARAM##*=}"
+             emailSenderID="${PARAM#*=}"
          elif echo "$PARAM" | grep -qE '^-Title=.+'
          then
-             emailBodyTitle="${PARAM##*=}"
+             emailBodyTitle="${PARAM#*=}"
          elif echo "$PARAM" | grep -qE '^-Attach=.+'
          then
-             emailAttachFile="${PARAM##*=}"
+             emailAttachFile="${PARAM#*=}"
          elif echo "$PARAM" | grep -qE '^-CCName=.+'
          then
-             emailCCName="${PARAM##*=}"
+             emailCCName="${PARAM#*=}"
              [ "$emailCCName" = 'TBD' ] && emailCCName=''
          elif echo "$PARAM" | grep -qE '^-CCEmail=.+'
          then
-             emailCCEmail="${PARAM##*=}"
+             emailCCEmail="${PARAM#*=}"
              [ "$emailCCEmail" = 'TBD' ] && emailCCEmail=''
          else
              # Allow single quotes in "Subject" string #
