@@ -16,10 +16,10 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-May-15 [Martinski W.]
+# Last Modified: 2026-Nov-10 [Martinski W.]
 #
-readonly SCRIPT_VERSION="0.7.16"
-readonly SCRIPT_VERSTAG="26051522"
+readonly SCRIPT_VERSION="0.7.17"
+readonly SCRIPT_VERSTAG="26111022"
 ######################################################################
 set -u 
 
@@ -910,7 +910,7 @@ _SaveStuckProcessCmds_()
                       if echo "$cpuPrcnt" | grep -qE '^[0-9]+([.][0-9]+)?$'
                       then
                           cpuPerNum="$(echo "$cpuPrcnt" | awk -F' ' '{print ($1 * 10)}')"
-                          if [ "$cpuPerNum" -gt 70 ]
+                          if [ "$cpuPerNum" -gt 50 ]
                           then
                               kill -9 $ProcXPID
                               LogMsg="[kill -9 $ProcXPID][$?]"
