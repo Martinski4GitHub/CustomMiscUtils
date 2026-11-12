@@ -16,12 +16,12 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-May-15 [Martinski W.]
+# Last Modified: 2026-Nov-11 [Martinski W.]
 #
-readonly SCRIPT_VERSION="0.7.16"
-readonly SCRIPT_VERSTAG="26051522"
+readonly SCRIPT_VERSION="0.7.17"
+readonly SCRIPT_VERSTAG="26111200"
 ######################################################################
-set -u 
+set -u
 
 #--------------------------------------------#
 # START CUSTOMIZABLE PARAMETERS SECTION.
@@ -412,9 +412,9 @@ _CheckForCronJobSetup_()
    jobStr="$(_GetCronJobList_ | grep " $ScriptFPath ")"
    if [ -n "$jobStr" ]
    then
-      cronMin="$(echo "$jobStr" | awk -F ' ' '{print $1}')"
-      jobPath="$(echo "$jobStr" | awk -F ' ' '{print $6}')"
-      cronTag="$(echo "$jobStr" | awk -F ' ' '{print $7}')"
+      cronMin="$(echo "$jobStr" | awk -F' ' '{print $1}')"
+      jobPath="$(echo "$jobStr" | awk -F' ' '{print $6}')"
+      cronTag="$(echo "$jobStr" | awk -F' ' '{print $7}')"
 
       if [ "$cronTag" != "$CRU_Tag" ]    || \
          [ "$cronMin" != "$theCronMins" ] || \
@@ -497,7 +497,7 @@ _DeleteCronJob_()
    fi
    if [ -n "$jobStrX" ]
    then
-       cronTag="$(echo "$jobStrX" | awk -F ' ' '{print $7}')"
+       cronTag="$(echo "$jobStrX" | awk -F' ' '{print $7}')"
        cronTag="$(echo "$cronTag" | sed "s/#//g")"
        [ -n "$cronTag" ] && $CRU_Cmd d "$cronTag"
    fi
@@ -661,8 +661,8 @@ _ShowParentProcEntry_()
 
    while read -r ProcEntry
    do
-      ProcCPID="$(echo $ProcEntry | awk -F ' ' '{print $1}')"
-      ProcPPID="$(echo $ProcEntry | awk -F ' ' '{print $2}')"
+      ProcCPID="$(echo $ProcEntry | awk -F' ' '{print $1}')"
+      ProcPPID="$(echo $ProcEntry | awk -F' ' '{print $2}')"
 
       if [ -z "$CPID_List"  ]
       then CPID_List="$ProcCPID"
@@ -732,10 +732,21 @@ _DoNotCareCPUs_()
    if [ $# -eq 0 ] || [ -z "$1" ]
    then echo ; return 1
    fi
-   local cmdStrY
-   local cpuNumr="$(echo "$1" | awk -F' ' '{print $7}')"
-   local cpuPerc="$(echo "$1" | awk -F' ' '{print $8}')"
-   local cmdStrX="$(echo "$1" | awk -F' ' '{print $9}')"
+   local VSZ_Num  theFieldNum  cpuNumr  cpuPerc  cmdStrX  cmdStrY
+
+   VSZ_Num="$(echo "$1" | awk -F' ' '{print $5}')"
+   if echo "$VSZ_Num" | grep -qE '^[0-9]+$'
+   then theFieldNum=7
+   else theFieldNum=8
+   fi
+   cpuNumr="$(echo "$1" | awk -v FNUM="$theFieldNum" -F' ' '{print $FNUM}')"
+
+   theFieldNum="$((theFieldNum + 1))"
+   cpuPerc="$(echo "$1" | awk -v FNUM="$theFieldNum" -F' ' '{print $FNUM}')"
+
+   theFieldNum="$((theFieldNum + 1))"
+   cmdStrX="$(echo "$1" | awk -v FNUM="$theFieldNum" -F' ' '{print $FNUM}')"
+
    cmdStrX="$(_EscapeChars_ "$cmdStrX")"
    cmdStrY="$(_EscapeChars_ "$cmdStrX")"
 
@@ -821,7 +832,7 @@ _GetStuckProcessCmds_()
 
       if [ -n "$ProcEntry1" ] && [ -n "$ProcEntryN" ]
       then
-          ProcState="$(echo "$ProcEntry1" | awk -F ' ' '{print $4}')"
+          ProcState="$(echo "$ProcEntry1" | awk -F' ' '{print $4}')"
           if ! echo "$ProcState" | grep -qE "^(R|S|Z)$"
           then ProcEntry1=""
           fi
@@ -841,8 +852,8 @@ _SaveStuckProcessCmds_()
 {
    local ProcXPID  ProcPPID  ProcFound  KillEntryLog
    local NowTimeSecs  LastTimeSecs  TimeDiffSecs  LastTime
-   local ProcStrX  ProcStrN  cmdState  cpuPrcnt  cpuPerNum
-   local nvramLockFile="/var/nvram.lock"  procKilled
+   local ProcStrX  ProcStrN  cmdState  cpuPrcnt  cpuPerNum  VSZ_Num
+   local nvramLockFile="/var/nvram.lock"  procKilled  theFieldNum
 
    _GetStuckProcessCmds_
 
@@ -877,11 +888,17 @@ _SaveStuckProcessCmds_()
          ProcStrN="$(grep -m1 -E "${ProcStrX}$" "$StuckCmdsLOGfile")"
          if [ -n "$ProcStrN" ]
          then
-            LastTime="$(echo "$ProcStrN" | awk -F ' ' '{print $1,$2}')"
-            ProcXPID="$(echo "$ProcStrN" | awk -F ' ' '{print $3}')"
-            ProcPPID="$(echo "$ProcStrN" | awk -F ' ' '{print $4}')"
-            cmdState="$(echo "$ProcStrN" | awk -F ' ' '{print $6}')"
-            cpuPrcnt="$(echo "$ProcStrN" | awk -F ' ' '{print $10}')"
+            LastTime="$(echo "$ProcStrN" | awk -F' ' '{print $1,$2}')"
+            ProcXPID="$(echo "$ProcStrN" | awk -F' ' '{print $3}')"
+            ProcPPID="$(echo "$ProcStrN" | awk -F' ' '{print $4}')"
+            cmdState="$(echo "$ProcStrN" | awk -F' ' '{print $6}')"
+
+            VSZ_Num="$(echo "$1" | awk -F' ' '{print $7}')"
+            if echo "$VSZ_Num" | grep -qE '^[0-9]+$'
+            then theFieldNum=10
+            else theFieldNum=11
+            fi
+            cpuPrcnt="$(echo "$ProcStrN" | awk -v FNUM="$theFieldNum" -F' ' '{print $FNUM}')"
          fi
          if [ -n "$ProcXPID" ] && [ -n "$ProcPPID" ] && \
             [ -n "$LastTime" ] && [ -n "$cmdState" ] && [ -n "$cpuPrcnt" ]
@@ -910,7 +927,7 @@ _SaveStuckProcessCmds_()
                       if echo "$cpuPrcnt" | grep -qE '^[0-9]+([.][0-9]+)?$'
                       then
                           cpuPerNum="$(echo "$cpuPrcnt" | awk -F' ' '{print ($1 * 10)}')"
-                          if [ "$cpuPerNum" -gt 70 ]
+                          if [ "$cpuPerNum" -gt 50 ]
                           then
                               kill -9 $ProcXPID
                               LogMsg="[kill -9 $ProcXPID][$?]"
