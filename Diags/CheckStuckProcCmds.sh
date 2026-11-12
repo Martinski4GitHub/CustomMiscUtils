@@ -19,7 +19,7 @@
 # Last Modified: 2026-Nov-11 [Martinski W.]
 #
 readonly SCRIPT_VERSION="0.7.17"
-readonly SCRIPT_VERSTAG="26111200"
+readonly SCRIPT_VERSTAG="26111201"
 ######################################################################
 set -u
 
@@ -561,7 +561,8 @@ _CheckScriptUpdate_()
        return 0
    fi
 
-   printf "\nLatest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${NOct}] available.\n"
+   printf "\nThe script version installed [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${NOct}].\n"
+   printf "Latest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${NOct}] available.\n"
    mv -f "$theTempFile" "$scriptFPath"
    chmod 755 "$scriptFPath"
    printf "Script has been updated to the latest version [${GRNct}${dlVersionStr}_${dlVersTagStr}${NOct}].\n\n"
