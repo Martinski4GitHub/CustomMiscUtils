@@ -16,10 +16,10 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-Nov-20 [Martinski W.]
+# Last Modified: 2026-Nov-21 [Martinski W.]
 #
-readonly SCRIPT_VERSION="0.7.18"
-readonly SCRIPT_VERSTAG="26112023"
+readonly SCRIPT_VERSION="0.7.19"
+readonly SCRIPT_VERSTAG="26112101"
 ######################################################################
 set -u
 
@@ -688,8 +688,8 @@ _ShowParentProcEntry_()
 
    while read -r ProcEntry
    do
-      ProcCPID="$(echo $ProcEntry | awk -F' ' '{print $1}')"
-      ProcPPID="$(echo $ProcEntry | awk -F' ' '{print $2}')"
+      ProcCPID="$(echo "$ProcEntry" | awk -F' ' '{print $1}')"
+      ProcPPID="$(echo "$ProcEntry" | awk -F' ' '{print $2}')"
 
       if [ -z "$CPID_List"  ]
       then CPID_List="$ProcCPID"
@@ -855,7 +855,7 @@ _GetStuckProcessCmds_()
                     grep -m 1 -v "$grepExcept0")"
 
       ProcEntryN="$(eval $FindProcs | eval $SortPIDs | \
-                    grep -m $ProcCount -v "$grepExcept0")"
+                    grep -m "$ProcCount" -v "$grepExcept0")"
 
       if [ -n "$ProcEntry1" ] && [ -n "$ProcEntryN" ]
       then
@@ -920,7 +920,7 @@ _SaveStuckProcessCmds_()
             ProcPPID="$(echo "$ProcStrN" | awk -F' ' '{print $4}')"
             cmdState="$(echo "$ProcStrN" | awk -F' ' '{print $6}')"
 
-            VSZ_Num="$(echo "$1" | awk -F' ' '{print $7}')"
+            VSZ_Num="$(echo "$ProcStrN" | awk -F' ' '{print $7}')"
             if echo "$VSZ_Num" | grep -qE '^[0-9]+$'
             then theFieldNum=10
             else theFieldNum=11
@@ -946,7 +946,7 @@ _SaveStuckProcessCmds_()
                then
                   if [ "$cmdState" = "Z" ] && [ "$ProcPPID" -gt 2 ]
                   then  #Kill Parent#
-                     kill -9 $ProcPPID
+                     kill -9 "$ProcPPID"
                      LogMsg="[kill -9 $ProcPPID][$?]"
                      procKilled=true
                   elif [ "$cmdState" = "R" ]
@@ -956,13 +956,13 @@ _SaveStuckProcessCmds_()
                           cpuPerNum="$(echo "$cpuPrcnt" | awk -F' ' '{print ($1 * 10)}')"
                           if [ "$cpuPerNum" -gt 50 ]
                           then
-                              kill -9 $ProcXPID
+                              kill -9 "$ProcXPID"
                               LogMsg="[kill -9 $ProcXPID][$?]"
                               procKilled=true
                           fi
                       fi
                   else
-                     kill -9 $ProcXPID
+                     kill -9 "$ProcXPID"
                      LogMsg="[kill -9 $ProcXPID][$?]"
                      procKilled=true
                   fi
