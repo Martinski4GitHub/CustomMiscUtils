@@ -16,10 +16,10 @@
 # ./CheckStuckProcCmds.sh -checkupdate
 #---------------------------------------------------------------------
 # Creation Date: 2022-Jun-12 [Martinski W.]
-# Last Modified: 2026-Nov-11 [Martinski W.]
+# Last Modified: 2026-Nov-20 [Martinski W.]
 #
-readonly SCRIPT_VERSION="0.7.17"
-readonly SCRIPT_VERSTAG="26111201"
+readonly SCRIPT_VERSION="0.7.18"
+readonly SCRIPT_VERSTAG="26112023"
 ######################################################################
 set -u
 
@@ -53,7 +53,7 @@ ShowDebugMsgs=0
 CRON_Set=0
 gotDelayArg=false
 readonly UseKillCmd=1
-readonly doSleepSecs=4
+readonly doSleepSecs=3
 readonly MaxDiffSecs=5
 readonly MaxTraceIndex=99999
 readonly CRON_Tag="CheckStuckCmds"
@@ -81,13 +81,13 @@ readonly MaxLogSize=$_25KBytes
 TheLOGtag=""
 TheBKPtag="_BKP"
 SetBKPLogFile=1
-readonly DEF_LOG_Dir="/tmp/var/tmp"
+readonly DEF_TMP_Dir="/tmp/var/tmp"
 readonly DEF_TRC_Dir="/tmp/var/tmp"
 
 [ ! -d "$TheLOGdir" ] && mkdir "$TheLOGdir" 2>/dev/null
 [ ! -d "$TheTRCdir" ] && mkdir "$TheTRCdir" 2>/dev/null
 
-[ ! -d "$TheLOGdir" ] && TheLOGdir="$DEF_LOG_Dir"
+[ ! -d "$TheLOGdir" ] && TheLOGdir="$DEF_TMP_Dir"
 [ ! -d "$TheTRCdir" ] && TheTRCdir="$DEF_TRC_Dir"
 [ ! -d "$TheTRCdir" ] && mkdir "$TheTRCdir" 2>/dev/null
 
@@ -519,11 +519,33 @@ _DeleteCronJob_()
 }
 
 ##################################################################
+_VersionStrToNum_()
+{
+   if [ $# -eq 0 ] || [ -z "$1" ]
+   then echo 0 ; return 1
+   fi
+   local verNum  verStr
+
+   verStr="$(echo "$1" | sed "s/[v'\"]//g")"
+   verNum="$(echo "$verStr" | awk -F '.' '{printf ("%d%02d%02d\n", $1,$2,$3);}')"
+   verNum="$(echo "$verNum" | sed 's/^0*//')"
+   echo "$verNum" ; return 0
+}
+
+##################################################################
 _CheckScriptUpdate_()
 {
    local dlVersionStr  dlVersTagStr  scriptMD5  dlTempMD5
-   local scriptFPath="${ScriptFolder}/$SCRIPT_FNAME"
-   local theTempFile="${DEF_LOG_Dir}/${SCRIPT_FNAME}.TMP"
+   local scriptVerNum  dlFileVerNum  curVerStr  newVerStr
+   local theTempFile="${DEF_TMP_Dir}/${SCRIPT_FNAME}.SH.TMP"
+
+   _FormatVersionStr_()
+   {
+       if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
+       then echo ; return 1
+       fi
+       echo "${GRNct}${1}${NOct} [${GRNct}${2}${NOct}]"
+   }
 
    curl -LSs --retry 4 --retry-delay 5 --retry-connrefused \
    "${SCRIPT_URL_GH}/$SCRIPT_FNAME" -o "$theTempFile"
@@ -548,24 +570,28 @@ _CheckScriptUpdate_()
    fi
 
    dlTempMD5="$(md5sum "$theTempFile" 2>/dev/null | awk -F' ' '{print $1}')"
-   scriptMD5="$(md5sum "$scriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
+   scriptMD5="$(md5sum "$ScriptFPath" 2>/dev/null | awk -F' ' '{print $1}')"
    dlVersionStr="$(echo "$dlVersionStr" | tr -d '"' | cut -d'=' -f2)"
    dlVersTagStr="$(echo "$dlVersTagStr" | tr -d '"' | cut -d'=' -f2)"
+   dlFileVerNum="$(_VersionStrToNum_ "$dlVersionStr")"
+   scriptVerNum="$(_VersionStrToNum_ "$SCRIPT_VERSION")"
+   curVerStr="$(_FormatVersionStr_ "$SCRIPT_VERSION" "$SCRIPT_VERSTAG")"
 
-   if [ "$scriptMD5" = "$dlTempMD5" ] && \
-      [ "$dlVersionStr" = "$SCRIPT_VERSION" ] && \
-      [ "$dlVersTagStr" = "$SCRIPT_VERSTAG" ]
+   if [ "$scriptMD5" = "$dlTempMD5" ] || \
+      { [ "$dlFileVerNum" -lt "$scriptVerNum" ] && \
+        [ "$dlVersTagStr" -lt "$SCRIPT_VERSTAG" ] ; }
    then
-       printf "\nYou have the latest script version [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${NOct}] available.\n\n"
        rm -f "$theTempFile"
+       printf "\nYou have the latest script version $curVerStr installed.\n\n"
        return 0
    fi
 
-   printf "\nThe script version installed [${GRNct}${SCRIPT_VERSION}_${SCRIPT_VERSTAG}${NOct}].\n"
-   printf "Latest script version update [${MGNTct}${dlVersionStr}_${dlVersTagStr}${NOct}] available.\n"
-   mv -f "$theTempFile" "$scriptFPath"
-   chmod 755 "$scriptFPath"
-   printf "Script has been updated to the latest version [${GRNct}${dlVersionStr}_${dlVersTagStr}${NOct}].\n\n"
+   newVerStr="$(_FormatVersionStr_ "$dlVersionStr" "$dlVersTagStr")"
+   printf "\nThe script version $curVerStr is installed.\n"
+   printf "Latest script version update $newVerStr is available.\n"
+   mv -f "$theTempFile" "$ScriptFPath"
+   chmod 755 "$ScriptFPath"
+   printf "Script has been updated to the latest version $newVerStr available.\n\n"
    return 0
 }
 
@@ -645,7 +671,7 @@ _GetTraceFilePath_()
 ##################################################################
 _ResetStuckProcessCmdsFile_()
 {
-   if [ -f "$StuckCmdsLOGfile" ]
+   if [ -s "$StuckCmdsLOGfile" ]
    then
       local traceFilePath=""
       traceFilePath="$(_GetTraceFilePath_)"
@@ -989,7 +1015,8 @@ then
 
    if _StuckProcessCmdsRunning_ "-ShowMsg1" && \
       [ "$theNumPIDs" -lt 4 ]
-   then $ScriptFPath -setdelay &
+   then
+       { sleep 2 ; $ScriptFPath -setdelay ; } &
    fi
 
    if "$RecheckStuckCmds" && \
